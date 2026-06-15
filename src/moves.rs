@@ -1,8 +1,8 @@
 use crate::board::Board;
+use crate::game::CastlingRights;
 use crate::mv::Move;
 use crate::piece::{Color, PieceType};
 use crate::square::Square;
-use crate::game::CastlingRights;
 
 const KNIGHT_OFFSETS: [(isize, isize); 8] = [
     (2, 1),
@@ -324,8 +324,7 @@ fn add_castling_moves(
         let path_safe = (king_from_file + 1..=king_to_file)
             .all(|f| !is_square_attacked(board, Square::new_unchecked(f, rank), color.opponent()));
 
-        let rook_ok = board.piece_at(rook_from)
-            == Some(crate::Piece::new(PieceType::Rook, color));
+        let rook_ok = board.piece_at(rook_from) == Some(crate::Piece::new(PieceType::Rook, color));
 
         if path_clear && path_safe && rook_ok {
             moves.push(Move::new(from, king_to));
@@ -345,8 +344,7 @@ fn add_castling_moves(
         let path_safe = (king_to_file..king_from_file)
             .all(|f| !is_square_attacked(board, Square::new_unchecked(f, rank), color.opponent()));
 
-        let rook_ok = board.piece_at(rook_from)
-            == Some(crate::Piece::new(PieceType::Rook, color));
+        let rook_ok = board.piece_at(rook_from) == Some(crate::Piece::new(PieceType::Rook, color));
 
         if path_clear && path_safe && rook_ok {
             moves.push(Move::new(from, king_to));
@@ -378,7 +376,13 @@ fn is_legal(board: &Board, mv: &Move, color: Color) -> bool {
     !is_square_attacked(&new_board, king_sq, color.opponent())
 }
 
-pub fn perft(board: &Board, depth: u32, color: Color, ep_target: Option<Square>, castling: &CastlingRights) -> u64 {
+pub fn perft(
+    board: &Board,
+    depth: u32,
+    color: Color,
+    ep_target: Option<Square>,
+    castling: &CastlingRights,
+) -> u64 {
     if depth == 0 {
         return 1;
     }
@@ -399,7 +403,9 @@ pub fn perft(board: &Board, depth: u32, color: Color, ep_target: Option<Square>,
         let piece = new_board.piece_at(mv.from);
 
         let is_ep = piece.map_or(false, |p| {
-            p.kind == PieceType::Pawn && mv.from.file != mv.to.file && board.piece_at(mv.to).is_none()
+            p.kind == PieceType::Pawn
+                && mv.from.file != mv.to.file
+                && board.piece_at(mv.to).is_none()
         });
 
         new_board.set_piece(mv.to, piece);
@@ -417,7 +423,13 @@ pub fn perft(board: &Board, depth: u32, color: Color, ep_target: Option<Square>,
         let new_ep = next_ep_target(&piece, &mv);
         let new_castling = update_castling_rights(castling, &piece, &mv, &new_board);
 
-        total += perft(&new_board, depth - 1, color.opponent(), new_ep, &new_castling);
+        total += perft(
+            &new_board,
+            depth - 1,
+            color.opponent(),
+            new_ep,
+            &new_castling,
+        );
     }
 
     total

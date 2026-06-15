@@ -1,9 +1,9 @@
 use crate::board::Board;
 use crate::fen;
+use crate::moves;
 use crate::mv::Move;
 use crate::piece::{Color, Piece, PieceType};
 use crate::square::Square;
-use crate::moves;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum GameStatus {
@@ -311,7 +311,10 @@ impl Game {
         }
 
         if pieces.len() == 4 {
-            let bishops: Vec<&Piece> = pieces.iter().filter(|p| p.kind == PieceType::Bishop).collect();
+            let bishops: Vec<&Piece> = pieces
+                .iter()
+                .filter(|p| p.kind == PieceType::Bishop)
+                .collect();
             if bishops.len() == 2 {
                 let same_color = bishops
                     .iter()
@@ -344,11 +347,7 @@ impl Game {
         format!(
             "{}-{}-{}-{}",
             self.board.to_fen(),
-            if self.turn == Color::White {
-                'w'
-            } else {
-                'b'
-            },
+            if self.turn == Color::White { 'w' } else { 'b' },
             castling_to_string(&self.castling),
             self.ep_target
                 .map_or("-".to_string(), |sq| sq.to_algebraic())
@@ -425,7 +424,8 @@ mod tests {
 
     #[test]
     fn test_king_in_check() {
-        let game = Game::from_fen("rnb1kbnr/pppppppp/8/8/8/5q2/PPPPPPPP/RNB1KBNR w KQkq - 0 1").unwrap();
+        let game =
+            Game::from_fen("rnb1kbnr/pppppppp/8/8/8/5q2/PPPPPPPP/RNB1KBNR w KQkq - 0 1").unwrap();
         let king = game.board.king_square(Color::White).unwrap();
         assert!(!moves::is_square_attacked(game.board(), king, Color::Black));
     }

@@ -44,7 +44,8 @@ impl Square {
 enum PieceType { King, Queen, Rook, Bishop, Knight, Pawn }
 impl PieceType {
     fn from_char(c: char) -> Option<Self>;  // 'k'/'K' → King
-    fn to_unicode(self, color: Color) -> &'static str;  // ♔♕♖♗♘♙♚♛♜♝♞♟
+    fn to_unicode(self, color: Color) -> &'static str;       // ♔♕♖♗♘♙♚♛♜♝♞♟
+    fn to_unicode_square(self, color: Color, is_light: bool) -> &'static str;  // glifo baseado na casa
 }
 ```
 
@@ -146,6 +147,13 @@ use chess::*;
 fn main() {
     let mut game = Game::new();
 
+    // Constantes ANSI para cores (mesmo esquema de main.rs)
+    const BG_LIGHT: &str = "\x1b[48;5;255m";
+    const BG_DARK: &str = "\x1b[48;5;236m";
+    const FG_DARK: &str = "\x1b[30m";
+    const FG_LIGHT: &str = "\x1b[97m";
+    const RESET: &str = "\x1b[0m";
+
     // Loop de jogo (substitua por seu próprio render/input)
     loop {
         // Render
@@ -153,10 +161,13 @@ fn main() {
         for rank in (0..8).rev() {
             for file in 0..8 {
                 let sq = Square::new_unchecked(file, rank);
+                let is_light = (rank + file) % 2 == 0;
+                let bg = if is_light { BG_LIGHT } else { BG_DARK };
+                let fg = if is_light { FG_DARK } else { FG_LIGHT };
                 if let Some(p) = board.piece_at(sq) {
-                    print!("{}", p.kind.to_unicode(p.color));
+                    print!("{}{}{}{}", bg, fg, p.kind.to_unicode_square(p.color, is_light), RESET);
                 } else {
-                    print!(".");
+                    print!("{} {}", bg, RESET);
                 }
             }
             println!();

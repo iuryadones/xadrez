@@ -25,7 +25,7 @@ src/
 ├── main.rs        ← Binary: game loop, terminal I/O
 ├── lib.rs         ← Re-exports públicos
 ├── square.rs      ← Square { file, rank }
-├── piece.rs       ← Color, PieceType, Piece + to_unicode
+├── piece.rs       ← Color, PieceType, Piece + to_unicode / to_unicode_square
 ├── board.rs       ← Board 8×8, init, FEN
 ├── mv.rs          ← Move { from, to, promotion }
 ├── moves.rs       ← Geração de movimentos legais + Perft

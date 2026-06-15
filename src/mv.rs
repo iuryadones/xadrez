@@ -29,6 +29,11 @@ impl Move {
             Some(pt) => format!("={}", pt.to_char().to_ascii_uppercase()),
             None => String::new(),
         };
-        format!("{}{}{}", self.from.to_algebraic(), self.to.to_algebraic(), promo)
+        format!(
+            "{}{}{}",
+            self.from.to_algebraic(),
+            self.to.to_algebraic(),
+            promo
+        )
     }
 }

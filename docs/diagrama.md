@@ -94,12 +94,24 @@ Game
 ## Sistema de Cores ANSI
 
 ```
-BG_LIGHT = \x1b[48;5;255m  (fundo claro)
-BG_DARK  = \x1b[48;5;236m  (fundo escuro)
-FG_WHITE = \x1b[97m        (texto branco brilhante — peças brancas)
-FG_BLACK = \x1b[90m        (texto cinza — peças pretas)
+BG_LIGHT = \x1b[48;5;255m  (fundo claro — bege)
+BG_DARK  = \x1b[48;5;236m  (fundo escuro — cinza)
+FG_DARK  = \x1b[30m        (texto preto — usado em casas claras)
+FG_LIGHT = \x1b[97m        (texto branco brilhante — usado em casas escuras)
 RESET    = \x1b[0m         (reset)
 ```
 
-Cada célula do tabuleiro alterna entre BG_LIGHT e BG_DARK,
-criando o padrão xadrez.
+A cor do texto (foreground) é definida pela cor da **casa**, não pela cor da peça:
+- Casas claras → texto escuro (contraste máximo)
+- Casas escuras → texto claro (contraste máximo)
+
+O glifo (outline vs sólido) depende da **cor da peça combinada com a casa**,
+criando regras inversas para cada jogador:
+
+| Jogador | Casa clara | Casa escura |
+|---------|------------|-------------|
+| Brancas (♔) | outline ♙ + preto | sólido ♟ + branco |
+| Pretas (♚)  | sólido ♟ + preto | outline ♔ + branco |
+
+Isto garante que peças de jogadores diferentes no mesmo tipo de casa
+usem glifos opostos, mantendo-se sempre distinguíveis.

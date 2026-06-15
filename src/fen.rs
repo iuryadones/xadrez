@@ -1,7 +1,9 @@
 use crate::game::CastlingRights;
-use crate::{Board, Square, Color};
+use crate::{Board, Color, Square};
 
-pub fn parse_fen(fen: &str) -> Result<(Board, Color, CastlingRights, Option<Square>, u8, u16), String> {
+pub fn parse_fen(
+    fen: &str,
+) -> Result<(Board, Color, CastlingRights, Option<Square>, u8, u16), String> {
     let parts: Vec<&str> = fen.split_whitespace().collect();
     if parts.len() < 4 {
         return Err("FEN precisa de ao menos 4 campos".into());
@@ -26,13 +28,17 @@ pub fn parse_fen(fen: &str) -> Result<(Board, Color, CastlingRights, Option<Squa
     };
 
     let halfmove = if parts.len() > 4 {
-        parts[4].parse::<u8>().map_err(|_| "Halfmove clock invalido".to_string())?
+        parts[4]
+            .parse::<u8>()
+            .map_err(|_| "Halfmove clock invalido".to_string())?
     } else {
         0
     };
 
     let fullmove = if parts.len() > 5 {
-        parts[5].parse::<u16>().map_err(|_| "Fullmove number invalido".to_string())?
+        parts[5]
+            .parse::<u16>()
+            .map_err(|_| "Fullmove number invalido".to_string())?
     } else {
         1
     };
@@ -71,18 +77,36 @@ pub fn to_fen(
     };
 
     let mut castling_str = String::new();
-    if castling.white_kingside { castling_str.push('K'); }
-    if castling.white_queenside { castling_str.push('Q'); }
-    if castling.black_kingside { castling_str.push('k'); }
-    if castling.black_queenside { castling_str.push('q'); }
-    if castling_str.is_empty() { castling_str.push('-'); }
+    if castling.white_kingside {
+        castling_str.push('K');
+    }
+    if castling.white_queenside {
+        castling_str.push('Q');
+    }
+    if castling.black_kingside {
+        castling_str.push('k');
+    }
+    if castling.black_queenside {
+        castling_str.push('q');
+    }
+    if castling_str.is_empty() {
+        castling_str.push('-');
+    }
 
     let ep_str = match ep_target {
         Some(sq) => sq.to_algebraic(),
         None => "-".to_string(),
     };
 
-    format!("{} {} {} {} {} {}", board.to_fen(), turn_str, castling_str, ep_str, halfmove, fullmove)
+    format!(
+        "{} {} {} {} {} {}",
+        board.to_fen(),
+        turn_str,
+        castling_str,
+        ep_str,
+        halfmove,
+        fullmove
+    )
 }
 
 #[cfg(test)]

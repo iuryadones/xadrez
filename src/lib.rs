@@ -1,13 +1,13 @@
-pub mod square;
-pub mod piece;
 pub mod board;
-pub mod mv;
-pub mod moves;
-pub mod game;
 pub mod fen;
+pub mod game;
+pub mod moves;
+pub mod mv;
+pub mod piece;
+pub mod square;
 
-pub use square::Square;
-pub use piece::{Color, PieceType, Piece};
 pub use board::Board;
+pub use game::{CastlingRights, Game, GameStatus};
 pub use mv::Move;
-pub use game::{Game, GameStatus, CastlingRights};
+pub use piece::{Color, Piece, PieceType};
+pub use square::Square;

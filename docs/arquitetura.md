@@ -27,7 +27,7 @@ src/
 ├── main.rs           # Binary: game loop, render, parsedor de entrada
 │
 ├── board.rs          # Board 8×8, init, from_fen, to_fen, king_square
-├── piece.rs          # Color, PieceType, Piece + to_unicode()
+├── piece.rs          # Color, PieceType, Piece + to_unicode() / to_unicode_square()
 ├── square.rs         # Square { file, rank } + algebraica
 ├── mv.rs             # Move { from, to, promotion }
 ├── moves.rs          # Geração de movimentos legais + Perft

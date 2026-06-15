@@ -4,8 +4,8 @@ use std::io::{self, BufRead, Write};
 const RESET: &str = "\x1b[0m";
 const BG_LIGHT: &str = "\x1b[48;5;255m";
 const BG_DARK: &str = "\x1b[48;5;236m";
-const FG_WHITE: &str = "\x1b[97m";
-const FG_BLACK: &str = "\x1b[90m";
+const FG_DARK: &str = "\x1b[30m";
+const FG_LIGHT: &str = "\x1b[97m";
 
 fn main() {
     let mut game = Game::new();
@@ -90,9 +90,7 @@ fn main() {
                 }
             },
             None => {
-                println!(
-                    "  Jogada invalida. Digite 'moves' para ver as jogadas possiveis."
-                );
+                println!("  Jogada invalida. Digite 'moves' para ver as jogadas possiveis.");
             }
         }
     }
@@ -110,11 +108,8 @@ fn render(game: &Game) {
             let bg = if is_light { BG_LIGHT } else { BG_DARK };
             match board.piece_at(sq) {
                 Some(p) => {
-                    let fg = match p.color {
-                        Color::White => FG_WHITE,
-                        Color::Black => FG_BLACK,
-                    };
-                    print!("{}{} {} {}", bg, fg, p.kind.to_unicode(p.color), RESET);
+                    let fg = if is_light { FG_DARK } else { FG_LIGHT };
+                    print!("{}{} {} {}", bg, fg, p.kind.to_unicode_square(p.color, is_light), RESET);
                 }
                 None => {
                     print!("{}   {}", bg, RESET);
@@ -130,10 +125,7 @@ fn render(game: &Game) {
 fn show_legal_moves(game: &Game) {
     let moves = game.legal_moves();
     println!("  Jogadas legais ({}):", moves.len());
-    let mut algebraic: Vec<String> = moves
-        .iter()
-        .map(|mv| move_to_algebraic(game, mv))
-        .collect();
+    let mut algebraic: Vec<String> = moves.iter().map(|mv| move_to_algebraic(game, mv)).collect();
     algebraic.sort();
 
     for chunk in algebraic.chunks(6) {
@@ -256,9 +248,7 @@ fn disambiguation(game: &Game, mv: &Move, piece: Piece) -> String {
     let same_target: Vec<&Move> = moves
         .iter()
         .filter(|lm| {
-            lm.to == mv.to
-                && lm.from != mv.from
-                && game.board().piece_at(lm.from) == Some(piece)
+            lm.to == mv.to && lm.from != mv.from && game.board().piece_at(lm.from) == Some(piece)
         })
         .collect();
 
@@ -314,8 +304,8 @@ fn parse_algebraic(game: &Game, input: &str) -> Option<Move> {
 
 fn try_parse_coordinate(game: &Game, input: &str) -> Option<Move> {
     let clean = input.replace('=', "");
-    let promo = clean.as_bytes().len() > 4
-        && PieceType::from_char(clean.as_bytes()[4] as char).is_some();
+    let promo =
+        clean.as_bytes().len() > 4 && PieceType::from_char(clean.as_bytes()[4] as char).is_some();
 
     let (coord, promotion_char) = if promo {
         (&clean[..4], clean.as_bytes()[4] as char)
@@ -339,11 +329,9 @@ fn try_parse_coordinate(game: &Game, input: &str) -> Option<Move> {
         None
     };
 
-    game.legal_moves().into_iter().find(|mv| {
-        mv.from == from
-            && mv.to == to
-            && mv.promotion == promotion
-    })
+    game.legal_moves()
+        .into_iter()
+        .find(|mv| mv.from == from && mv.to == to && mv.promotion == promotion)
 }
 
 fn try_parse_algebraic_move(game: &Game, input: &str) -> Option<Move> {
@@ -453,9 +441,9 @@ fn parse_pawn_move(game: &Game, input: &str, promotion: Option<PieceType>) -> Op
         .legal_moves()
         .into_iter()
         .filter(|mv| {
-            game.board().piece_at(mv.from)
-                .map_or(false, |p| p.kind == PieceType::Pawn && p.color == game.turn())
-                && mv.to == target_sq
+            game.board().piece_at(mv.from).map_or(false, |p| {
+                p.kind == PieceType::Pawn && p.color == game.turn()
+            }) && mv.to == target_sq
                 && mv.promotion == promotion
         })
         .collect();
