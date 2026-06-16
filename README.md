@@ -40,13 +40,15 @@ make run
 ## Comandos
 
 ```bash
-make setup     # Instalar Rust toolchain
-make build     # Compilar
-make test      # Rodar testes (67 testes + 1 ignorado)
-make run       # Executar jogo no terminal
-make web       # Servir frontend WASM (trunk serve)
-make fmt       # Formatar código
-make lint      # Verificar lints
+make setup       # Instalar Rust toolchain
+make build       # Compilar
+make test        # Rodar testes (67 testes + 1 ignorado)
+make run         # Executar jogo no terminal
+make web-run     # Servir frontend WASM com hot reload (trunk serve)
+make web-build   # Compilar WASM release
+make web-deploy  # Compilar e publicar no GitHub Pages
+make fmt         # Formatar código
+make lint        # Verificar lints
 ```
 
 ## Como Jogar
