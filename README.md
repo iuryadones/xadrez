@@ -9,6 +9,7 @@ Jogo de xadrez completo implementado em Rust, jogável no terminal e via navegad
 ## Funcionalidades
 
 - ✅ Jogo completo 2 jogadores no terminal + WebAssembly
+- ✅ Modo PvBot com dificuldade ajustável (Fácil/Médio/Difícil/Aleatório)
 - ✅ Todas as regras: roque, en passant, promoção
 - ✅ Detecção de xeque, xeque-mate, afogamento
 - ✅ Material insuficiente, regra dos 50/75 movimentos, tripla/quíntupla repetição
@@ -61,6 +62,11 @@ Comandos do jogo:
   fen            → mostrar FEN atual
   quit / exit    → sair
 ```
+
+Ao executar `make run`, o jogo pergunta:
+1. **Modo**: `1` — Jogador vs Computador / `2` — Jogador vs Jogador
+2. **Dificuldade** (modo PvBot): `1` Fácil / `2` Médio / `3` Difícil / `4` Aleatório
+3. O bot começa com cor sorteada automaticamente.
 
 ## Licença
 

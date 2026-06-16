@@ -183,7 +183,7 @@ fn quiescence(game: &Game, alpha: i32, beta: i32, color: Color) -> i32 {
         if g.make_move(mv).is_err() {
             continue;
         }
-        let score = -quiescence(&g, -beta, -alpha, color);
+        let score = -quiescence(&g, -beta, -alpha, color.opponent());
         if score >= beta {
             return beta;
         }
@@ -206,13 +206,12 @@ fn negamax(
     }
 
     if game.status() != crate::GameStatus::Ongoing {
-        let result = evaluate(game);
         return if game.status() == crate::GameStatus::WhiteWins {
             if color == Color::White { INF - 1 } else { -INF + 1 }
         } else if game.status() == crate::GameStatus::BlackWins {
             if color == Color::Black { INF - 1 } else { -INF + 1 }
         } else {
-            result
+            0
         };
     }
 
@@ -237,11 +236,11 @@ fn negamax(
         }
         let score;
         if searched == 0 {
-            score = -negamax(&g, depth - 1, -beta, -alpha, color);
+            score = -negamax(&g, depth - 1, -beta, -alpha, color.opponent());
         } else {
-            let mut s = -negamax(&g, depth - 1, -alpha - 1, -alpha, color);
+            let mut s = -negamax(&g, depth - 1, -alpha - 1, -alpha, color.opponent());
             if s > alpha && s < beta {
-                s = -negamax(&g, depth - 1, -beta, -alpha, color);
+                s = -negamax(&g, depth - 1, -beta, -alpha, color.opponent());
             }
             score = s;
         }
@@ -286,7 +285,7 @@ fn iterative_deepening(game: &Game, max_depth: u32) -> Option<Move> {
             if g.make_move(mv).is_err() {
                 continue;
             }
-            let score = -negamax(&g, depth - 1, -beta, -alpha, color);
+            let score = -negamax(&g, depth - 1, -beta, -alpha, color.opponent());
             if score > current_score {
                 current_score = score;
                 current_best = Some(mv);
@@ -361,7 +360,7 @@ pub fn color_name(color: Color) -> &'static str {
     }
 }
 
-pub fn piece_name(color: Color) -> &'static str {
+pub fn king_symbol(color: Color) -> &'static str {
     match color {
         Color::White => "♔",
         Color::Black => "♚",

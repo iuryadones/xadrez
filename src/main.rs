@@ -74,6 +74,7 @@ fn show_banner() {
     println!("║  fen            → mostrar FEN    ║");
     println!("║  undo           → desfazer       ║");
     println!("║  quit/exit      → sair           ║");
+    println!("║  help            → ajuda          ║");
     println!("╚══════════════════════════════════╝");
     println!();
 }
@@ -159,17 +160,17 @@ fn run_pvbot(difficulty: ai::Difficulty) {
 
     game_loop(|game, stdout| {
         if game.turn() == bot_color {
-            print!("  {} pensando...", ai::piece_name(bot_color));
+            print!("  {} pensando...", ai::king_symbol(bot_color));
             stdout.flush().unwrap();
 
             match ai::best_move_with_depth(game, difficulty.depth()) {
                 Some(mv) => {
                     let alg = move_to_algebraic(game, &mv);
-                    println!("\r  {} jogou {}  ", ai::piece_name(bot_color), alg);
+                    println!("\r  {} jogou {}  ", ai::king_symbol(bot_color), alg);
                     game.make_move(mv).ok();
                 }
                 None => {
-                    println!("\r  {} sem jogadas legais.", ai::piece_name(bot_color));
+                    println!("\r  {} sem jogadas legais.", ai::king_symbol(bot_color));
                 }
             }
             true
