@@ -71,20 +71,7 @@ impl PieceType {
             (Color::White, true) | (Color::Black, false) => Color::White,
             (Color::White, false) | (Color::Black, true) => Color::Black,
         };
-        match (self, display_color) {
-            (PieceType::King, Color::White) => "♔",
-            (PieceType::King, Color::Black) => "♚",
-            (PieceType::Queen, Color::White) => "♕",
-            (PieceType::Queen, Color::Black) => "♛",
-            (PieceType::Rook, Color::White) => "♖",
-            (PieceType::Rook, Color::Black) => "♜",
-            (PieceType::Bishop, Color::White) => "♗",
-            (PieceType::Bishop, Color::Black) => "♝",
-            (PieceType::Knight, Color::White) => "♘",
-            (PieceType::Knight, Color::Black) => "♞",
-            (PieceType::Pawn, Color::White) => "♙",
-            (PieceType::Pawn, Color::Black) => "♟",
-        }
+        self.to_unicode(display_color)
     }
 }
 

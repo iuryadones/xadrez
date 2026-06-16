@@ -1,9 +1,11 @@
 use crate::game::CastlingRights;
 use crate::{Board, Color, Square};
 
+type FenResult = Result<(Board, Color, CastlingRights, Option<Square>, u8, u16), String>;
+
 pub fn parse_fen(
     fen: &str,
-) -> Result<(Board, Color, CastlingRights, Option<Square>, u8, u16), String> {
+) -> FenResult {
     let parts: Vec<&str> = fen.split_whitespace().collect();
     if parts.len() < 4 {
         return Err("FEN precisa de ao menos 4 campos".into());
@@ -142,5 +144,34 @@ mod tests {
 
         let white_pawn_e4 = board.piece_at(Square::from_algebraic("e4").unwrap());
         assert!(white_pawn_e4.is_some());
+    }
+
+    #[test]
+    fn test_fen_invalid_too_few_fields() {
+        assert!(parse_fen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR").is_err());
+    }
+
+    #[test]
+    fn test_fen_invalid_piece_char() {
+        assert!(Board::from_fen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPX/RNBQKBNR").is_err());
+    }
+
+    #[test]
+    fn test_fen_castling_dash() {
+        let fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w - - 0 1";
+        let (_, _, castling, _, _, _) = parse_fen(fen).unwrap();
+        assert_eq!(castling, CastlingRights::none());
+    }
+
+    #[test]
+    fn test_fen_ep_dash() {
+        let fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+        let (_, _, _, ep, _, _) = parse_fen(fen).unwrap();
+        assert!(ep.is_none());
+    }
+
+    #[test]
+    fn test_fen_invalid_turn() {
+        assert!(parse_fen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR x KQkq - 0 1").is_err());
     }
 }

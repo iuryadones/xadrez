@@ -29,9 +29,12 @@ src/
 ├── board.rs       ← Board 8×8, init, FEN
 ├── mv.rs          ← Move { from, to, promotion }
 ├── moves.rs       ← Geração de movimentos legais + Perft
-├── game.rs        ← Game state, make_move, status
-└── fen.rs         ← Parse/serialize FEN
+├── game.rs        ← Game state, make_move, undo, status
+├── fen.rs         ← Parse/serialize FEN
+└── notation.rs    ← Notação algébrica (move_to_algebraic, parse_algebraic)
 ```
+
+A biblioteca tem **zero dependências externas** — apenas Rust std.
 
 ## Testes
 
@@ -51,6 +54,7 @@ O projeto inclui testes Perft que validam a geração de movimentos:
 | 2     | 400           | 400 ✓ |
 | 3     | 8.902         | 8.902 ✓ |
 | 4     | 197.281       | 197.281 ✓ |
+| 5     | 4.865.609     | 4.865.609 ✓ (ignorado por padrão) |
 
 ## Diretrizes
 

@@ -1,4 +1,5 @@
 use std::fmt;
+use std::str::FromStr;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Square {
@@ -46,7 +47,7 @@ impl Square {
     pub fn offset(self, df: isize, dr: isize) -> Option<Self> {
         let f = self.file as isize + df;
         let r = self.rank as isize + dr;
-        if f >= 0 && f < 8 && r >= 0 && r < 8 {
+        if (0..8).contains(&f) && (0..8).contains(&r) {
             Some(Self {
                 file: f as usize,
                 rank: r as usize,
@@ -54,6 +55,14 @@ impl Square {
         } else {
             None
         }
+    }
+}
+
+impl FromStr for Square {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Self::from_algebraic(s).ok_or_else(|| format!("Casa invalida: {}", s))
     }
 }
 

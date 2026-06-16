@@ -25,11 +25,11 @@ impl Board {
             PieceType::Rook,
         ];
 
-        for file in 0..8 {
-            board.squares[0][file] = Some(Piece::new(back_rank[file], Color::White));
+        for (file, &kind) in back_rank.iter().enumerate() {
+            board.squares[0][file] = Some(Piece::new(kind, Color::White));
             board.squares[1][file] = Some(Piece::new(PieceType::Pawn, Color::White));
             board.squares[6][file] = Some(Piece::new(PieceType::Pawn, Color::Black));
-            board.squares[7][file] = Some(Piece::new(back_rank[file], Color::Black));
+            board.squares[7][file] = Some(Piece::new(kind, Color::Black));
         }
 
         board
@@ -121,5 +121,46 @@ impl Board {
         }
 
         Ok(board)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_board_initial() {
+        let board = Board::initial();
+        assert_eq!(board.piece_at(Square::from_algebraic("e1").unwrap()), Some(Piece::new(PieceType::King, Color::White)));
+        assert_eq!(board.piece_at(Square::from_algebraic("d8").unwrap()), Some(Piece::new(PieceType::Queen, Color::Black)));
+        assert_eq!(board.piece_at(Square::from_algebraic("e4").unwrap()), None);
+    }
+
+    #[test]
+    fn test_board_from_fen_valid() {
+        let board = Board::from_fen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR").unwrap();
+        let initial = Board::initial();
+        assert_eq!(board, initial);
+    }
+
+    #[test]
+    fn test_board_from_fen_invalid_rank_count() {
+        assert!(Board::from_fen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP").is_err());
+    }
+
+
+    #[test]
+    fn test_board_king_square() {
+        let board = Board::initial();
+        assert_eq!(board.king_square(Color::White), Square::from_algebraic("e1"));
+        assert_eq!(board.king_square(Color::Black), Square::from_algebraic("e8"));
+    }
+
+    #[test]
+    fn test_board_to_fen_roundtrip() {
+        let board = Board::initial();
+        let fen = board.to_fen();
+        let parsed = Board::from_fen(&fen).unwrap();
+        assert_eq!(board, parsed);
     }
 }

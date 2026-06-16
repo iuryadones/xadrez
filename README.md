@@ -4,17 +4,22 @@
 [![License](https://img.shields.io/badge/License-MIT-green)](LICENSE)
 ![Zero unsafe](https://img.shields.io/badge/unsafe-0%25-brightgreen)
 
-Jogo de xadrez completo implementado em Rust, jogável no terminal.
+Jogo de xadrez completo implementado em Rust, jogável no terminal e via navegador (WebAssembly).
 
 ## Funcionalidades
 
-- ✅ Jogo completo 2 jogadores no terminal
+- ✅ Jogo completo 2 jogadores no terminal + WebAssembly
 - ✅ Todas as regras: roque, en passant, promoção
 - ✅ Detecção de xeque, xeque-mate, afogamento
-- ✅ Material insuficiente, regra dos 50 movimentos, tripla repetição
+- ✅ Material insuficiente, regra dos 50/75 movimentos, tripla/quíntupla repetição
 - ✅ Notação algébrica (e4, Nf3, O-O, Bxe5, exd5)
-- ✅ Cores ANSI com padrão xadrez
-- ✅ Zero dependências externas, 100% safe Rust
+- ✅ Notação de coordenadas (e2e4)
+- ✅ Cores ANSI com padrão xadrez (terminal)
+- ✅ Interface gráfica responsiva (WASM)
+- ✅ Desfazer jogadas (undo)
+- ✅ Diálogo de promoção (WASM)
+- ✅ Posições via FEN (importar/exportar/copiar)
+- ✅ Zero dependências externas (core), 100% safe Rust
 - ✅ API modular para integrar com GUI
 
 ## Quick Start
@@ -37,8 +42,9 @@ make run
 ```bash
 make setup     # Instalar Rust toolchain
 make build     # Compilar
-make test      # Rodar testes (16 testes)
-make run       # Executar jogo
+make test      # Rodar testes (67 testes + 1 ignorado)
+make run       # Executar jogo no terminal
+make web       # Servir frontend WASM (trunk serve)
 make fmt       # Formatar código
 make lint      # Verificar lints
 ```

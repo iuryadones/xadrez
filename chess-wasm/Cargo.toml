@@ -1,0 +1,15 @@
+[package]
+name = "chess-wasm"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+chess = { path = ".." }
+yew = { version = "0.21", features = ["csr"] }
+web-sys = { version = "0.3", features = [
+    "HtmlInputElement",
+    "Clipboard",
+    "Navigator",
+    "Window",
+] }
+wasm-bindgen = "0.2"

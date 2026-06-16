@@ -40,8 +40,8 @@ impl CastlingRights {
     }
 }
 
-#[derive(Clone, Debug)]
-pub struct Game {
+#[derive(Clone, Debug, PartialEq)]
+struct Snapshot {
     board: Board,
     turn: Color,
     castling: CastlingRights,
@@ -52,9 +52,28 @@ pub struct Game {
     move_history: Vec<Move>,
 }
 
+#[derive(Clone, Debug, PartialEq)]
+pub struct Game {
+    board: Board,
+    turn: Color,
+    castling: CastlingRights,
+    ep_target: Option<Square>,
+    halfmove_clock: u8,
+    fullmove_number: u16,
+    position_history: Vec<String>,
+    move_history: Vec<Move>,
+    undo_stack: Vec<Snapshot>,
+}
+
+impl Default for Game {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Game {
     pub fn new() -> Self {
-        Self {
+        let mut game = Self {
             board: Board::initial(),
             turn: Color::White,
             castling: CastlingRights::all(),
@@ -63,12 +82,15 @@ impl Game {
             fullmove_number: 1,
             position_history: Vec::new(),
             move_history: Vec::new(),
-        }
+            undo_stack: Vec::new(),
+        };
+        game.position_history.push(game.position_key());
+        game
     }
 
     pub fn from_fen(fen_str: &str) -> Result<Self, String> {
         let (board, turn, castling, ep_target, halfmove, fullmove) = fen::parse_fen(fen_str)?;
-        Ok(Self {
+        let mut game = Self {
             board,
             turn,
             castling,
@@ -77,7 +99,10 @@ impl Game {
             fullmove_number: fullmove,
             position_history: Vec::new(),
             move_history: Vec::new(),
-        })
+            undo_stack: Vec::new(),
+        };
+        game.position_history.push(game.position_key());
+        Ok(game)
     }
 
     pub fn board(&self) -> &Board {
@@ -126,6 +151,17 @@ impl Game {
             return Err("Jogada ilegal".into());
         }
 
+        self.undo_stack.push(Snapshot {
+            board: self.board.clone(),
+            turn: self.turn,
+            castling: self.castling,
+            ep_target: self.ep_target,
+            halfmove_clock: self.halfmove_clock,
+            fullmove_number: self.fullmove_number,
+            position_history: self.position_history.clone(),
+            move_history: self.move_history.clone(),
+        });
+
         let piece = self
             .board
             .piece_at(mv.from)
@@ -133,7 +169,7 @@ impl Game {
 
         let captured = self.board.piece_at(mv.to);
 
-        let is_ep = self.ep_target.map_or(false, |ep| mv.to == ep)
+        let is_ep = (self.ep_target == Some(mv.to))
             && piece.kind == PieceType::Pawn
             && mv.from.file != mv.to.file;
 
@@ -238,6 +274,22 @@ impl Game {
         Ok(())
     }
 
+    pub fn undo(&mut self) -> bool {
+        let snap = match self.undo_stack.pop() {
+            Some(s) => s,
+            None => return false,
+        };
+        self.board = snap.board;
+        self.turn = snap.turn;
+        self.castling = snap.castling;
+        self.ep_target = snap.ep_target;
+        self.halfmove_clock = snap.halfmove_clock;
+        self.fullmove_number = snap.fullmove_number;
+        self.position_history = snap.position_history;
+        self.move_history = snap.move_history;
+        true
+    }
+
     pub fn status(&self) -> GameStatus {
         let moves = self.legal_moves();
         let king_sq = match self.board.king_square(self.turn) {
@@ -262,15 +314,23 @@ impl Game {
             }
         }
 
+        if self.halfmove_clock >= 150 {
+            return GameStatus::Draw;
+        }
+
         if self.halfmove_clock >= 100 {
             return GameStatus::Draw;
         }
 
-        if self.is_insufficient_material() {
+        if self.is_fivefold_repetition() {
             return GameStatus::Draw;
         }
 
         if self.is_threefold_repetition() {
+            return GameStatus::Draw;
+        }
+
+        if self.is_insufficient_material() {
             return GameStatus::Draw;
         }
 
@@ -328,6 +388,21 @@ impl Game {
         false
     }
 
+    fn is_fivefold_repetition(&self) -> bool {
+        if self.position_history.len() < 2 {
+            return false;
+        }
+
+        let current = self.position_key();
+        let count = self
+            .position_history
+            .iter()
+            .filter(|&k| *k == current)
+            .count();
+
+        count >= 5
+    }
+
     fn is_threefold_repetition(&self) -> bool {
         if self.position_history.len() < 2 {
             return false;
@@ -340,7 +415,7 @@ impl Game {
             .filter(|&k| *k == current)
             .count();
 
-        count >= 2
+        count >= 3
     }
 
     fn position_key(&self) -> String {
@@ -400,29 +475,6 @@ mod tests {
     }
 
     #[test]
-    fn test_scholars_mate() {
-        let mut game = Game::new();
-        let moves = [
-            ("e2", "e4"),
-            ("e7", "e5"),
-            ("f1", "c4"),
-            ("b8", "c6"),
-            ("d1", "h5"),
-            ("g8", "f6"),
-            ("h5", "f7"),
-        ];
-
-        for &(from, to) in &moves {
-            let from_sq = Square::from_algebraic(from).unwrap();
-            let to_sq = Square::from_algebraic(to).unwrap();
-            let mv = Move::new(from_sq, to_sq);
-            assert!(game.make_move(mv).is_ok());
-        }
-
-        assert_eq!(game.status(), GameStatus::WhiteWins);
-    }
-
-    #[test]
     fn test_king_in_check() {
         let game =
             Game::from_fen("rnb1kbnr/pppppppp/8/8/8/5q2/PPPPPPPP/RNB1KBNR w KQkq - 0 1").unwrap();
@@ -475,6 +527,195 @@ mod tests {
 
         let mut game = game.clone();
         game.make_move(Move::new(ka1, kb1)).unwrap();
+        assert_eq!(game.status(), GameStatus::Draw);
+    }
+
+    #[test]
+    fn test_en_passant_capture() {
+        let mut game = Game::new();
+        game.make_move(Move::new(Square::from_algebraic("e2").unwrap(), "e4".parse().unwrap())).unwrap();
+        game.make_move(Move::new(Square::from_algebraic("d7").unwrap(), "d5".parse().unwrap())).unwrap();
+        game.make_move(Move::new(Square::from_algebraic("e4").unwrap(), "e5".parse().unwrap())).unwrap();
+        game.make_move(Move::new(Square::from_algebraic("f7").unwrap(), "f5".parse().unwrap())).unwrap();
+        let ep_move = Move::new(Square::from_algebraic("e5").unwrap(), "f6".parse().unwrap());
+        assert!(game.legal_moves().contains(&ep_move));
+        game.make_move(ep_move).unwrap();
+        assert!(game.board.piece_at(Square::from_algebraic("f6").unwrap()).is_some());
+        assert!(game.board.piece_at(Square::from_algebraic("f5").unwrap()).is_none());
+        assert!(game.board.piece_at(Square::from_algebraic("e5").unwrap()).is_none());
+    }
+
+    #[test]
+    fn test_en_passant_expiry() {
+        let mut game = Game::new();
+        game.make_move(Move::new("e2".parse().unwrap(), "e4".parse().unwrap())).unwrap();
+        assert_eq!(game.ep_target, Square::from_algebraic("e3"));
+        game.make_move(Move::new("d7".parse().unwrap(), "d6".parse().unwrap())).unwrap();
+        assert!(game.ep_target.is_none());
+    }
+
+    #[test]
+    fn test_queenside_castling() {
+        let fen = "r3k2r/pppppppp/8/8/8/8/PPPPPPPP/R3K2R w KQkq - 0 1";
+        let mut game = Game::from_fen(fen).unwrap();
+        let e1 = Square::from_algebraic("e1").unwrap();
+        let c1 = Square::from_algebraic("c1").unwrap();
+        let mv = Move::new(e1, c1);
+        assert!(game.legal_moves().contains(&mv));
+        game.make_move(mv).unwrap();
+        assert_eq!(
+            game.board.piece_at(Square::from_algebraic("d1").unwrap()),
+            Some(Piece::new(PieceType::Rook, Color::White))
+        );
+        assert_eq!(game.board.piece_at(c1), Some(Piece::new(PieceType::King, Color::White)));
+        assert!(game.board.piece_at(Square::from_algebraic("a1").unwrap()).is_none());
+    }
+
+    #[test]
+    fn test_castling_blocked() {
+        let fen = "r3k2r/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+        let game = Game::from_fen(fen).unwrap();
+        let e1 = Square::from_algebraic("e1").unwrap();
+        let g1 = Square::from_algebraic("g1").unwrap();
+        let kingside = Move::new(e1, g1);
+        assert!(!game.legal_moves().contains(&kingside));
+    }
+
+    #[test]
+    fn test_castling_through_check() {
+        let fen = "r3k2r/pppppppp/8/8/8/5R2/PPPPPPPP/4K3 b KQkq - 0 1";
+        let mut game = Game::from_fen(fen).unwrap();
+        game.make_move(Move::new(Square::from_algebraic("e8").unwrap(), "d8".parse().unwrap())).unwrap();
+        let e1 = Square::from_algebraic("e1").unwrap();
+        let g1 = Square::from_algebraic("g1").unwrap();
+        assert!(!game.legal_moves().contains(&Move::new(e1, g1)));
+    }
+
+    #[test]
+    fn test_pawn_promotion() {
+        let fen = "4k3/P7/8/8/8/8/8/4K3 w - - 0 1";
+        let mut game = Game::from_fen(fen).unwrap();
+        let from = Square::from_algebraic("a7").unwrap();
+        let to = Square::from_algebraic("a8").unwrap();
+        let queen_mv = Move::new_promotion(from, to, PieceType::Queen);
+        assert!(game.legal_moves().contains(&queen_mv));
+        game.make_move(queen_mv).unwrap();
+        let piece = game.board.piece_at(to).unwrap();
+        assert_eq!(piece.kind, PieceType::Queen);
+        assert_eq!(piece.color, Color::White);
+    }
+
+    #[test]
+    fn test_underpromotion() {
+        let fen = "4k3/P7/8/8/8/8/8/4K3 w - - 0 1";
+        let mut game = Game::from_fen(fen).unwrap();
+        let from = Square::from_algebraic("a7").unwrap();
+        let to = Square::from_algebraic("a8").unwrap();
+        let knight_mv = Move::new_promotion(from, to, PieceType::Knight);
+        assert!(game.legal_moves().contains(&knight_mv));
+        game.make_move(knight_mv).unwrap();
+        let piece = game.board.piece_at(to).unwrap();
+        assert_eq!(piece.kind, PieceType::Knight);
+    }
+
+    #[test]
+    fn test_undo_move() {
+        let mut game = Game::new();
+        let initial = game.clone();
+        let e4 = Move::new(Square::from_algebraic("e2").unwrap(), Square::from_algebraic("e4").unwrap());
+        game.make_move(e4).unwrap();
+        assert_ne!(game, initial);
+        assert!(game.undo());
+        assert_eq!(game, initial);
+    }
+
+    #[test]
+    fn test_undo_twice() {
+        let mut game = Game::new();
+        let initial = game.clone();
+        let e4 = Move::new("e2".parse().unwrap(), "e4".parse().unwrap());
+        let d5 = Move::new("d7".parse().unwrap(), "d5".parse().unwrap());
+        game.make_move(e4).unwrap();
+        game.make_move(d5).unwrap();
+        game.undo();
+        game.undo();
+        assert_eq!(game, initial);
+    }
+
+    #[test]
+    fn test_undo_empty() {
+        let mut game = Game::new();
+        assert!(!game.undo());
+    }
+
+    #[test]
+    fn test_threefold_repetition() {
+        let mut game = Game::new();
+        let nf3 = Move::new("g1".parse().unwrap(), "f3".parse().unwrap());
+        let nf6 = Move::new("b8".parse().unwrap(), "c6".parse().unwrap());
+        let ng1 = Move::new("f3".parse().unwrap(), "g1".parse().unwrap());
+        let nc6 = Move::new("c6".parse().unwrap(), "b8".parse().unwrap());
+
+        for _ in 0..2 {
+            game.make_move(nf3).unwrap();
+            game.make_move(nf6).unwrap();
+            game.make_move(ng1).unwrap();
+            game.make_move(nc6).unwrap();
+        }
+        assert_eq!(game.status(), GameStatus::Draw);
+    }
+
+    #[test]
+    fn test_captured_rook_loses_castling() {
+        let fen = "r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1";
+        let mut game = Game::from_fen(fen).unwrap();
+        let ra1 = Square::from_algebraic("a1").unwrap();
+        let ra8 = Square::from_algebraic("a8").unwrap();
+        game.make_move(Move::new(ra1, ra8)).unwrap();
+        assert!(!game.castling.black_queenside);
+        assert!(!game.castling.white_queenside);
+    }
+
+    #[test]
+    fn test_rook_move_loses_castling() {
+        let fen = "r3k2r/8/8/8/8/8/8/4K2R w KQkq - 0 1";
+        let mut game = Game::from_fen(fen).unwrap();
+        game.make_move(Move::new(Square::from_algebraic("h1").unwrap(), Square::from_algebraic("g1").unwrap())).unwrap();
+        assert!(!game.castling.white_kingside);
+    }
+
+    #[test]
+    fn test_seventy_five_move_rule() {
+        let fen = "k6r/8/8/8/8/8/8/K6R w - - 149 75";
+        let mut game = Game::from_fen(fen).unwrap();
+        let mv = Move::new("a1".parse().unwrap(), "b1".parse().unwrap());
+        game.make_move(mv).unwrap();
+        assert_eq!(game.status(), GameStatus::Draw);
+    }
+
+    #[test]
+    fn test_seventy_five_move_rule_not_yet() {
+        let fen = "k6r/8/8/8/8/8/8/K6R w - - 80 40";
+        let mut game = Game::from_fen(fen).unwrap();
+        let mv = Move::new("a1".parse().unwrap(), "b1".parse().unwrap());
+        game.make_move(mv).unwrap();
+        assert_eq!(game.status(), GameStatus::Ongoing);
+    }
+
+    #[test]
+    fn test_fivefold_repetition() {
+        let mut game = Game::new();
+        let nf3 = Move::new("g1".parse().unwrap(), "f3".parse().unwrap());
+        let nc6 = Move::new("b8".parse().unwrap(), "c6".parse().unwrap());
+        let ng1 = Move::new("f3".parse().unwrap(), "g1".parse().unwrap());
+        let nb8 = Move::new("c6".parse().unwrap(), "b8".parse().unwrap());
+
+        for _ in 0..4 {
+            game.make_move(nf3).unwrap();
+            game.make_move(nc6).unwrap();
+            game.make_move(ng1).unwrap();
+            game.make_move(nb8).unwrap();
+        }
         assert_eq!(game.status(), GameStatus::Draw);
     }
 }

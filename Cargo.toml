@@ -4,4 +4,7 @@ version = "0.1.0"
 edition = "2021"
 description = "Jogo de xadrez completo no terminal em Rust"
 
+[workspace]
+members = ["chess-wasm"]
+
 [dependencies]

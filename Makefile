@@ -24,3 +24,13 @@ lint:
 
 check:
 	cargo check
+
+web-setup:
+	@which trunk > /dev/null 2>&1 || cargo install trunk
+	rustup target add wasm32-unknown-unknown
+
+web:
+	cd chess-wasm && trunk serve --open
+
+web-build:
+	cd chess-wasm && trunk build --release

@@ -7,12 +7,16 @@ O projeto é dividido em duas camadas:
 ```
 ┌─────────────────────────────────────────────┐
 │              binary (main.rs)               │
-│   Game loop  ·  Render ANSI  ·  Input       │
+│   Game loop  ·  Render ANSI                 │
 │   (acoplado ao terminal)                    │
+├─────────────────────────────────────────────┤
+│           chess-wasm (Yew + WASM)            │
+│   Componentes  ·  State reducer  ·  CSS     │
+│   (acoplado ao navegador)                   │
 ├─────────────────────────────────────────────┤
 │              library (lib.rs)               │
 │   Board  ·  Game  ·  Moves  ·  Fen          │
-│   (independente de UI)                      │
+│   Notation  ·  (independente de UI)         │
 └─────────────────────────────────────────────┘
 ```
 
@@ -21,27 +25,50 @@ Qualquer UI (terminal, web, desktop) pode consumi-la.
 
 ## Módulos
 
+### Library (src/)
+
 ```
 src/
 ├── lib.rs            # Re-exports públicos da library
-├── main.rs           # Binary: game loop, render, parsedor de entrada
-│
 ├── board.rs          # Board 8×8, init, from_fen, to_fen, king_square
 ├── piece.rs          # Color, PieceType, Piece + to_unicode() / to_unicode_square()
-├── square.rs         # Square { file, rank } + algebraica
+├── square.rs         # Square { file, rank } + FromStr
 ├── mv.rs             # Move { from, to, promotion }
 ├── moves.rs          # Geração de movimentos legais + Perft
-├── game.rs           # Game state, make_move, status, regras de fim
-└── fen.rs            # Parse e serialização FEN
+├── game.rs           # Game state, make_move, undo, status, regras de fim
+├── fen.rs            # Parse e serialização FEN
+└── notation.rs       # Notação algébrica: move_to_algebraic, parse_algebraic, disambiguation
+```
+
+### Frontend WASM (chess-wasm/)
+
+```
+chess-wasm/src/
+├── main.rs           # Entrypoint Yew
+├── app.rs            # Componente App (layout)
+├── state.rs          # GameState reducer (Select, MakeMove, Undo, NewGame, Promotion)
+├── render.rs         # Helpers de render (cor, glyph)
+└── components/
+    ├── chess_board.rs     # Grid 8×8 com click-to-move
+    ├── square_tile.rs     # Casa individual com labels rank/file
+    ├── piece_icon.rs      # Ícone Unicode com cor
+    ├── status_bar.rs      # Turno, xeque, resultado
+    ├── move_input.rs      # Input de notação algébrica
+    ├── move_list.rs       # Histórico de lances
+    ├── new_game.rs        # Botão novo jogo
+    ├── undo_button.rs     # Botão desfazer
+    ├── fen_display.rs     # FEN + copiar
+    └── promotion_dialog.rs# Seletor de promoção (modal)
 ```
 
 ## Fluxo de Dados
 
+**Terminal:**
 ```
                   ┌──────────┐
   Entrada ──────► │  main.rs │
   (e4, Nf3, etc)  └────┬─────┘
-                        │ parse_algebraic()
+                        │ parse_algebraic() (em notation.rs)
                         ▼
                   ┌──────────┐
                   │  Game    │
@@ -60,6 +87,25 @@ src/
          │ array  ││legal ││serial  │
          └────────┘└──────┘└────────┘
 ```
+
+**WASM:**
+```
+  Click/Input ──► state.dispatch(GameAction)
+                       │
+                       ▼
+                  GameState::reduce()
+                       │
+              ┌────────┼────────┐
+              ▼        ▼        ▼
+         Game::     Game::    Game::
+         make_move  legal_    status
+                    moves
+                       │
+                       ▼
+                  Componentes re-renderizam
+```
+
+A notação algébrica (`parse_algebraic`, `move_to_algebraic`) vive em `notation.rs` na library e é compartilhada entre o terminal e o WASM — sem duplicação de código.
 
 ## Como integrar com GUI
 
@@ -92,4 +138,6 @@ fn main() {
 
 **Library (`chess`):** Nenhuma. Rust std apenas.
 
-**Binary:** Usa ANSI escape codes para cores no terminal — sem crate externa.
+**Binary (terminal):** ANSI escape codes — sem crate externa.
+
+**Binary (WASM):** Yew 0.21, web-sys, wasm-bindgen.

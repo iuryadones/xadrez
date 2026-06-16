@@ -7,17 +7,51 @@ Obrigado pelo interesse em contribuir com este projeto!
 1. **Issues**: Reporte bugs ou sugira melhorias abrindo uma issue.
 2. **Pull Requests**: Envie PRs com suas alterações.
 
+## Pré-requisitos
+
+- Rust nightly (para fmt)
+- `trunk` — WASM bundler: `cargo install trunk`
+- `wasm32-unknown-unknown` target: `rustup target add wasm32-unknown-unknown`
+
 ## Padrões de código
 
 - **Linguagem**: Rust edition 2021
 - **Estilo**: `cargo fmt` antes de commitar
 - **Lints**: `cargo clippy -- -D warnings` — sem warnings
-- **Testes**: `cargo test` — todos os testes devem passar
+- **Testes**: `cargo test` — 67 testes + 1 ignored (Perft 5 ≈ 4.8M nós)
 - **Segurança**: zero `unsafe` — código 100% safe
 
 ## Estrutura do projeto
 
-Veja [docs/arquitetura.md](docs/arquitetura.md) para entender a organização dos módulos.
+```
+src/
+├── main.rs          ← Binary: terminal UI (ANSI, game loop, comandos)
+├── lib.rs           ← Library: Game, Board, Moves, Fen, Perft
+├── board.rs
+├── piece.rs
+├── square.rs
+├── mv.rs
+├── moves.rs
+├── game.rs
+├── fen.rs
+├── perft.rs
+└── notation.rs      ← Shared: parser algébrico (terminal + WASM)
+```
+
+Veja [docs/arquitetura.md](docs/arquitetura.md) para descrição detalhada.
+
+## Build e execução
+
+```bash
+# Terminal
+cargo run --release
+
+# WASM (desenvolvimento — hot reload)
+cd chess-wasm && trunk serve --open
+
+# WASM (release)
+cd chess-wasm && trunk build --release
+```
 
 ## Fluxo de contribuição
 

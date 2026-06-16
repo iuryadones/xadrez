@@ -1,7 +1,7 @@
 use crate::board::Board;
 use crate::game::CastlingRights;
 use crate::mv::Move;
-use crate::piece::{Color, PieceType};
+use crate::piece::{Color, Piece, PieceType};
 use crate::square::Square;
 
 const KNIGHT_OFFSETS: [(isize, isize); 8] = [
@@ -81,46 +81,30 @@ pub fn is_square_attacked(board: &Board, square: Square, by_color: Color) -> boo
 
     for &(df, dr) in &BISHOP_DIRS {
         let mut sq = square;
-        loop {
-            match sq.offset(df, dr) {
-                Some(next) => {
-                    sq = next;
-                    match board.piece_at(sq) {
-                        Some(p) => {
-                            if p.color == by_color
-                                && (p.kind == PieceType::Bishop || p.kind == PieceType::Queen)
-                            {
-                                return true;
-                            }
-                            break;
-                        }
-                        None => {}
-                    }
+        while let Some(next) = sq.offset(df, dr) {
+            sq = next;
+            if let Some(p) = board.piece_at(sq) {
+                if p.color == by_color
+                    && (p.kind == PieceType::Bishop || p.kind == PieceType::Queen)
+                {
+                    return true;
                 }
-                None => break,
+                break;
             }
         }
     }
 
     for &(df, dr) in &ROOK_DIRS {
         let mut sq = square;
-        loop {
-            match sq.offset(df, dr) {
-                Some(next) => {
-                    sq = next;
-                    match board.piece_at(sq) {
-                        Some(p) => {
-                            if p.color == by_color
-                                && (p.kind == PieceType::Rook || p.kind == PieceType::Queen)
-                            {
-                                return true;
-                            }
-                            break;
-                        }
-                        None => {}
-                    }
+        while let Some(next) = sq.offset(df, dr) {
+            sq = next;
+            if let Some(p) = board.piece_at(sq) {
+                if p.color == by_color
+                    && (p.kind == PieceType::Rook || p.kind == PieceType::Queen)
+                {
+                    return true;
                 }
-                None => break,
+                break;
             }
         }
     }
@@ -260,20 +244,17 @@ fn add_sliding_moves(
 ) {
     for &(df, dr) in dirs {
         let mut sq = from;
-        loop {
-            match sq.offset(df, dr) {
-                Some(to) => match board.piece_at(to) {
-                    Some(p) if p.color != color => {
-                        moves.push(Move::new(from, to));
-                        break;
-                    }
-                    Some(_) => break,
-                    None => {
-                        moves.push(Move::new(from, to));
-                        sq = to;
-                    }
-                },
-                None => break,
+        while let Some(to) = sq.offset(df, dr) {
+            match board.piece_at(to) {
+                Some(p) if p.color != color => {
+                    moves.push(Move::new(from, to));
+                    break;
+                }
+                Some(_) => break,
+                None => {
+                    moves.push(Move::new(from, to));
+                    sq = to;
+                }
             }
         }
     }
@@ -352,13 +333,22 @@ fn add_castling_moves(
     }
 }
 
-fn is_legal(board: &Board, mv: &Move, color: Color) -> bool {
-    let mut new_board = board.clone();
-
-    let piece = new_board.piece_at(mv.from);
-    let is_ep = piece.map_or(false, |p| {
+fn is_ep_move(piece: Option<Piece>, mv: &Move, board: &Board) -> bool {
+    piece.is_some_and(|p| {
         p.kind == PieceType::Pawn && mv.from.file != mv.to.file && board.piece_at(mv.to).is_none()
-    });
+    })
+}
+
+struct AppliedMove {
+    board: Board,
+    captured: Option<Piece>,
+}
+
+fn apply_move(board: &Board, mv: &Move, color: Color) -> AppliedMove {
+    let mut new_board = board.clone();
+    let piece = new_board.piece_at(mv.from);
+    let captured = new_board.piece_at(mv.to);
+    let is_ep = is_ep_move(piece, mv, board);
 
     new_board.set_piece(mv.to, piece);
     new_board.set_piece(mv.from, None);
@@ -368,12 +358,22 @@ fn is_legal(board: &Board, mv: &Move, color: Color) -> bool {
         new_board.set_piece(captured_sq, None);
     }
 
-    let king_sq = match new_board.king_square(color) {
+    if let Some(pt) = mv.promotion {
+        new_board.set_piece(mv.to, Some(Piece::new(pt, color)));
+    }
+
+    AppliedMove { board: new_board, captured }
+}
+
+fn is_legal(board: &Board, mv: &Move, color: Color) -> bool {
+    let applied = apply_move(board, mv, color);
+
+    let king_sq = match applied.board.king_square(color) {
         Some(sq) => sq,
         None => return false,
     };
 
-    !is_square_attacked(&new_board, king_sq, color.opponent())
+    !is_square_attacked(&applied.board, king_sq, color.opponent())
 }
 
 pub fn perft(
@@ -399,32 +399,14 @@ pub fn perft(
             continue;
         }
 
-        let mut new_board = board.clone();
-        let piece = new_board.piece_at(mv.from);
+        let applied = apply_move(board, &mv, color);
 
-        let is_ep = piece.map_or(false, |p| {
-            p.kind == PieceType::Pawn
-                && mv.from.file != mv.to.file
-                && board.piece_at(mv.to).is_none()
-        });
-
-        new_board.set_piece(mv.to, piece);
-        new_board.set_piece(mv.from, None);
-
-        if is_ep {
-            let captured_sq = Square::new_unchecked(mv.to.file, mv.from.rank);
-            new_board.set_piece(captured_sq, None);
-        }
-
-        if let Some(promo) = mv.promotion {
-            new_board.set_piece(mv.to, Some(crate::Piece::new(promo, color)));
-        }
-
+        let piece = board.piece_at(mv.from);
         let new_ep = next_ep_target(&piece, &mv);
-        let new_castling = update_castling_rights(castling, &piece, &mv, &new_board);
+        let new_castling = update_castling_rights(castling, &piece, &mv, applied.captured);
 
         total += perft(
-            &new_board,
+            &applied.board,
             depth - 1,
             color.opponent(),
             new_ep,
@@ -450,9 +432,9 @@ fn next_ep_target(piece: &Option<crate::Piece>, mv: &Move) -> Option<Square> {
 
 fn update_castling_rights(
     castling: &CastlingRights,
-    piece: &Option<crate::Piece>,
+    piece: &Option<Piece>,
     mv: &Move,
-    new_board: &Board,
+    captured: Option<Piece>,
 ) -> CastlingRights {
     let mut new_castling = *castling;
 
@@ -481,7 +463,6 @@ fn update_castling_rights(
         }
     }
 
-    let captured = new_board.piece_at(mv.to);
     if let Some(p) = captured {
         if p.kind == PieceType::Rook {
             match (p.color, mv.to.file) {
@@ -535,6 +516,14 @@ mod tests {
     }
 
     #[test]
+    #[ignore]
+    fn test_perft_depth_5() {
+        let board = Board::initial();
+        let count = perft(&board, 5, Color::White, None, &initial_castling());
+        assert_eq!(count, 4865609);
+    }
+
+    #[test]
     fn test_king_not_in_check_initial() {
         let board = Board::initial();
         let king_sq = board.king_square(Color::White).unwrap();
@@ -547,5 +536,61 @@ mod tests {
         let board = Board::from_fen(&fen[..fen.find(' ').unwrap_or(fen.len())]).unwrap();
         let king_sq = board.king_square(Color::Black).unwrap();
         assert!(is_square_attacked(&board, king_sq, Color::White));
+    }
+
+    #[test]
+    fn test_perft_kiwipete() {
+        let fen = "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1";
+        let placement = &fen[..fen.find(' ').unwrap_or(fen.len())];
+        let board = Board::from_fen(placement).unwrap();
+        let castling = crate::fen::parse_fen(fen).unwrap().2;
+        let count = perft(&board, 1, Color::White, None, &castling);
+        assert_eq!(count, 48);
+    }
+
+    #[test]
+    fn test_pinned_piece_cant_move() {
+        let fen = "4k3/8/8/8/8/4r3/4B3/4K3 w - - 0 1";
+        let board = Board::from_fen(&fen[..fen.find(' ').unwrap_or(fen.len())]).unwrap();
+        let moves = legal_moves(&board, Color::White, None, &CastlingRights::none());
+        assert!(!moves.iter().any(|m| m.from == Square::from_algebraic("e2").unwrap()));
+    }
+
+    #[test]
+    fn test_double_check_only_king() {
+        let fen = "4k3/8/8/8/7b/8/3q4/R3K3 w - - 0 1";
+        let board = Board::from_fen(&fen[..fen.find(' ').unwrap_or(fen.len())]).unwrap();
+        let moves = legal_moves(&board, Color::White, None, &CastlingRights::none());
+        assert!(moves.iter().all(|m| {
+            let piece = board.piece_at(m.from).unwrap();
+            piece.kind == PieceType::King
+        }));
+    }
+
+    #[test]
+    fn test_en_passant_move_generated() {
+        let fen = "4k3/8/8/8/3p4/8/4P3/4K3 b - e3 0 1";
+        let placement = &fen[..fen.find(' ').unwrap_or(fen.len())];
+        let board = Board::from_fen(placement).unwrap();
+        let ep = Square::from_algebraic("e3");
+        let moves = pseudo_legal_moves(&board, Color::Black, ep, &CastlingRights::none());
+        let d4 = Square::from_algebraic("d4").unwrap();
+        assert!(moves.iter().any(|m| m.from == d4 && m.to == ep.unwrap()));
+    }
+
+    #[test]
+    fn test_all_promotion_types_generated() {
+        let fen = "4k3/P7/8/8/8/8/8/4K3 w - - 0 1";
+        let placement = &fen[..fen.find(' ').unwrap_or(fen.len())];
+        let board = Board::from_fen(placement).unwrap();
+        let a7 = Square::from_algebraic("a7").unwrap();
+        let a8 = Square::from_algebraic("a8").unwrap();
+        let moves = pseudo_legal_moves(&board, Color::White, None, &CastlingRights::none());
+        let promo_moves: Vec<&Move> = moves.iter().filter(|m| m.from == a7 && m.to == a8).collect();
+        assert_eq!(promo_moves.len(), 4);
+        assert!(promo_moves.iter().any(|m| m.promotion == Some(PieceType::Queen)));
+        assert!(promo_moves.iter().any(|m| m.promotion == Some(PieceType::Rook)));
+        assert!(promo_moves.iter().any(|m| m.promotion == Some(PieceType::Bishop)));
+        assert!(promo_moves.iter().any(|m| m.promotion == Some(PieceType::Knight)));
     }
 }
