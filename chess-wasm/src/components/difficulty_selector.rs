@@ -1,4 +1,4 @@
-use chess::ai::{self, Difficulty};
+use chess::ai::Difficulty;
 use yew::prelude::*;
 
 use crate::state::{GameAction, GameState, Mode};
@@ -31,7 +31,13 @@ pub fn DifficultySelector(props: &DifficultySelectorProps) -> Html {
     let on_random = {
         let state = props.state.clone();
         Callback::from(move |_: MouseEvent| {
-            state.dispatch(GameAction::SetDifficulty(ai::random_difficulty()))
+            let idx = (js_sys::Math::random() * 3.0).floor() as u32;
+            let diff = match idx {
+                0 => Difficulty::Easy,
+                1 => Difficulty::Medium,
+                _ => Difficulty::Hard,
+            };
+            state.dispatch(GameAction::SetDifficulty(diff))
         })
     };
     let on_back = {

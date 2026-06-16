@@ -8,6 +8,11 @@ pub struct MoveInputProps {
     pub state: yew::UseReducerHandle<GameState>,
 }
 
+fn can_move(state: &GameState) -> bool {
+    !state.bot_pending
+        && !(state.mode == Some(Mode::PvBot) && Some(state.game.turn()) == state.bot_color)
+}
+
 #[function_component]
 pub fn MoveInput(props: &MoveInputProps) -> Html {
     let input_ref = use_node_ref();
@@ -16,7 +21,7 @@ pub fn MoveInput(props: &MoveInputProps) -> Html {
         let state = props.state.clone();
         let input_ref = input_ref.clone();
         Callback::from(move |_: MouseEvent| {
-            if state.mode == Some(Mode::PvBot) && Some(state.game.turn()) == state.bot_color {
+            if !can_move(&state) {
                 return;
             }
             if let Some(input) = input_ref.cast::<web_sys::HtmlInputElement>() {
@@ -33,7 +38,7 @@ pub fn MoveInput(props: &MoveInputProps) -> Html {
         let state = props.state.clone();
         let input_ref = input_ref.clone();
         Callback::from(move |e: KeyboardEvent| {
-            if state.mode == Some(Mode::PvBot) && Some(state.game.turn()) == state.bot_color {
+            if !can_move(&state) {
                 return;
             }
             if e.key() == "Enter" {
@@ -48,17 +53,18 @@ pub fn MoveInput(props: &MoveInputProps) -> Html {
         })
     };
 
-    let is_bot_turn = props.state.mode == Some(Mode::PvBot)
-        && Some(props.state.game.turn()) == props.state.bot_color;
+    let blocked = props.state.bot_pending
+        || (props.state.mode == Some(Mode::PvBot)
+            && Some(props.state.game.turn()) == props.state.bot_color);
 
     html! {
         <div class="move-input-row">
             <input ref={input_ref}
                 placeholder="e4, Nf3, O-O..."
-                disabled={is_bot_turn}
+                disabled={blocked}
                 onkeypress={on_keypress}
             />
-            <button disabled={is_bot_turn} onclick={on_submit}>{ "Jogar" }</button>
+            <button disabled={blocked} onclick={on_submit}>{ "Jogar" }</button>
         </div>
     }
 }

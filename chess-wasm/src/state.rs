@@ -1,5 +1,6 @@
 use chess::*;
-use chess::ai::{self, Difficulty};
+use chess::ai::Difficulty;
+use js_sys;
 use yew::Reducible;
 
 #[derive(Clone, PartialEq, Copy)]
@@ -19,6 +20,7 @@ pub struct GameState {
     pub mode: Option<Mode>,
     pub difficulty: Option<Difficulty>,
     pub bot_color: Option<Color>,
+    pub bot_pending: bool,
 }
 
 pub enum GameAction {
@@ -32,6 +34,26 @@ pub enum GameAction {
     CancelPromotion,
     SetMode(Mode),
     SetDifficulty(Difficulty),
+    BotMove(Move),
+}
+
+fn wasm_coin_flip() -> Color {
+    if (js_sys::Math::random() * 2.0).floor() as u32 == 0 {
+        Color::White
+    } else {
+        Color::Black
+    }
+}
+
+fn is_bot_turn(game: &Game, mode: Option<Mode>, bot_color: Option<Color>) -> bool {
+    mode == Some(Mode::PvBot) && Some(game.turn()) == bot_color
+}
+
+fn make_human_move(game: &mut Game, history: &mut Vec<String>, mv: Move) {
+    let notation = move_to_algebraic(game, &mv);
+    if game.make_move(mv).is_ok() {
+        history.push(notation);
+    }
 }
 
 impl Default for GameState {
@@ -46,37 +68,7 @@ impl Default for GameState {
             mode: None,
             difficulty: None,
             bot_color: None,
-        }
-    }
-}
-
-fn play_bot_move(game: &mut Game, history: &mut Vec<String>, difficulty: Difficulty) {
-    if let Some(mv) = ai::best_move_with_depth(game, difficulty.depth()) {
-        let notation = move_to_algebraic(game, &mv);
-        if game.make_move(mv).is_ok() {
-            history.push(notation);
-        }
-    }
-}
-
-fn make_move_and_trigger_bot(
-    game: &mut Game,
-    history: &mut Vec<String>,
-    mv: Move,
-    mode: Option<Mode>,
-    bot_color: Option<Color>,
-    difficulty: Option<Difficulty>,
-) {
-    let notation = move_to_algebraic(game, &mv);
-    if game.make_move(mv).is_ok() {
-        history.push(notation);
-        if mode == Some(Mode::PvBot)
-            && game.status() == GameStatus::Ongoing
-            && Some(game.turn()) == bot_color
-        {
-            if let Some(diff) = difficulty {
-                play_bot_move(game, history, diff);
-            }
+            bot_pending: false,
         }
     }
 }
@@ -93,32 +85,31 @@ impl Reducible for GameState {
                 next.mode = Some(mode);
                 next.difficulty = None;
                 next.bot_color = None;
+                next.bot_pending = false;
                 next.selected = None;
                 next.legal_moves_for_selected = Vec::new();
                 next.pending_promotion = None;
                 next.input_error = false;
             }
             GameAction::SetDifficulty(diff) => {
-                let bot_color = ai::coin_flip();
+                let bot_color = wasm_coin_flip();
                 next.game = Game::new();
                 next.move_history = Vec::new();
                 next.difficulty = Some(diff);
                 next.bot_color = Some(bot_color);
+                next.bot_pending = bot_color == Color::White;
                 next.selected = None;
                 next.legal_moves_for_selected = Vec::new();
                 next.pending_promotion = None;
                 next.input_error = false;
-
-                if bot_color == Color::White {
-                    play_bot_move(&mut next.game, &mut next.move_history, diff);
-                }
             }
             GameAction::Select(sq) => {
-                let turn = next.game.turn();
-                if next.mode == Some(Mode::PvBot) && Some(turn) == next.bot_color {
-                    next.input_error = false;
+                if is_bot_turn(&next.game, next.mode, next.bot_color)
+                    || next.bot_pending
+                {
                     return std::rc::Rc::new(next);
                 }
+                let turn = next.game.turn();
                 if next.game.board().piece_at(sq).is_some_and(|p| p.color == turn) {
                     next.selected = Some(sq);
                     next.legal_moves_for_selected = next.game.legal_moves().into_iter()
@@ -137,7 +128,9 @@ impl Reducible for GameState {
                 next.input_error = false;
             }
             GameAction::MakeMove(mv) => {
-                if next.mode == Some(Mode::PvBot) && Some(next.game.turn()) == next.bot_color {
+                if is_bot_turn(&next.game, next.mode, next.bot_color)
+                    || next.bot_pending
+                {
                     return std::rc::Rc::new(next);
                 }
                 if mv.promotion.is_none() {
@@ -149,20 +142,15 @@ impl Reducible for GameState {
                         return std::rc::Rc::new(next);
                     }
                 }
-                let mode = next.mode;
-                let bot_color = next.bot_color;
-                let difficulty = next.difficulty;
-                make_move_and_trigger_bot(
-                    &mut next.game,
-                    &mut next.move_history,
-                    mv,
-                    mode,
-                    bot_color,
-                    difficulty,
-                );
+                make_human_move(&mut next.game, &mut next.move_history, mv);
                 next.selected = None;
                 next.legal_moves_for_selected = Vec::new();
                 next.input_error = false;
+                if is_bot_turn(&next.game, next.mode, next.bot_color)
+                    && next.game.status() == GameStatus::Ongoing
+                {
+                    next.bot_pending = true;
+                }
             }
             GameAction::RequestPromotion { from, to } => {
                 let candidates: Vec<Move> = next.game.legal_moves().into_iter()
@@ -174,17 +162,22 @@ impl Reducible for GameState {
             }
             GameAction::PromotionSelected(mv) => {
                 next.pending_promotion = None;
-                let mode = next.mode;
-                let bot_color = next.bot_color;
-                let difficulty = next.difficulty;
-                make_move_and_trigger_bot(
-                    &mut next.game,
-                    &mut next.move_history,
-                    mv,
-                    mode,
-                    bot_color,
-                    difficulty,
-                );
+                make_human_move(&mut next.game, &mut next.move_history, mv);
+                next.selected = None;
+                next.legal_moves_for_selected = Vec::new();
+                next.input_error = false;
+                if is_bot_turn(&next.game, next.mode, next.bot_color)
+                    && next.game.status() == GameStatus::Ongoing
+                {
+                    next.bot_pending = true;
+                }
+            }
+            GameAction::BotMove(mv) => {
+                next.bot_pending = false;
+                let notation = move_to_algebraic(&next.game, &mv);
+                if next.game.make_move(mv).is_ok() {
+                    next.move_history.push(notation);
+                }
                 next.selected = None;
                 next.legal_moves_for_selected = Vec::new();
                 next.input_error = false;
@@ -207,5 +200,3 @@ impl Reducible for GameState {
         std::rc::Rc::new(next)
     }
 }
-
-

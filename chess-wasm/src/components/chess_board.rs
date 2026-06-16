@@ -13,8 +13,9 @@ pub struct ChessBoardProps {
 pub fn ChessBoard(props: &ChessBoardProps) -> Html {
     let state_handle = props.state.clone();
 
-    let is_bot_turn = state_handle.mode == Some(Mode::PvBot)
-        && Some(state_handle.game.turn()) == state_handle.bot_color;
+    let blocked = state_handle.bot_pending
+        || (state_handle.mode == Some(Mode::PvBot)
+            && Some(state_handle.game.turn()) == state_handle.bot_color);
 
     let mut rows: Vec<Html> = Vec::new();
 
@@ -28,7 +29,7 @@ pub fn ChessBoard(props: &ChessBoardProps) -> Html {
             let is_legal_target = state_handle.legal_moves_for_selected.iter().any(|m| m.to == sq);
             let is_capture_target = is_legal_target && piece.is_some();
 
-            let on_click = if is_bot_turn {
+            let on_click = if blocked {
                 Callback::from(|_| {})
             } else {
                 let state = state_handle.clone();
