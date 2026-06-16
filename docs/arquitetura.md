@@ -37,7 +37,8 @@ src/
 ├── moves.rs          # Geração de movimentos legais + Perft
 ├── game.rs           # Game state, make_move, undo, status, regras de fim
 ├── fen.rs            # Parse e serialização FEN
-└── notation.rs       # Notação algébrica: move_to_algebraic, parse_algebraic, disambiguation
+├── notation.rs       # Notação algébrica: move_to_algebraic, parse_algebraic, disambiguation
+└── ai.rs             # Engine AI: Negamax + Alpha-Beta + PID + LMR + Quiescence + MVV-LVA + PST + TT + Zobrist
 ```
 
 ### Frontend WASM (chess-wasm/)
@@ -65,27 +66,39 @@ chess-wasm/src/
 
 **Terminal:**
 ```
-                  ┌──────────┐
-  Entrada ──────► │  main.rs │
-  (e4, Nf3, etc)  └────┬─────┘
-                        │ parse_algebraic() (em notation.rs)
-                        ▼
-                  ┌──────────┐
-                  │  Game    │
-                  │ .legal   │
-                  │ _moves() │
-                  │ .make    │
-                  │ _move()  │
-                  │ .status()│
-                  └────┬─────┘
-                       │
-              ┌────────┼────────┐
-              ▼        ▼        ▼
-         ┌────────┐┌──────┐┌────────┐
-         │ Board  ││Moves ││  Fen   │
-         │ 8×8    ││gen   ││parse/  │
-         │ array  ││legal ││serial  │
-         └────────┘└──────┘└────────┘
+                   ┌──────────┐
+   Entrada ──────► │  main.rs │
+   (e4, Nf3, etc)  └────┬─────┘
+                         │ parse_algebraic() (em notation.rs)
+                         ▼
+                   ┌──────────┐
+                   │  Game    │
+                   │ .legal   │
+                   │ _moves() │
+                   │ .make    │
+                   │ _move()  │
+                   │ .status()│
+                   └────┬─────┘
+                        │
+               ┌────────┼────────┬──────────┐
+               ▼        ▼        ▼          ▼
+          ┌────────┐┌──────┐┌────────┐┌────────┐
+          │ Board  ││Moves ││  Fen   ││  AI    │
+          │ 8×8    ││gen   ││parse/  ││Negamax │
+          │ array  ││legal ││serial  ││+ TT    │
+          └────────┘└──────┘└────────┘└────────┘
+
+   Bot joga:
+   ai::best_move_with_depth(game, depth)
+         │
+         ├── iterative_deepening (1..=depth)
+         │     └── negamax com TT probe/record
+         │           ├── Quiescence (capturas)
+         │           ├── LMR (late move reduction)
+         │           └── MVV-LVA ordering + TT best move
+         │
+         ▼
+   game.make_move(mv)  →  loop volta ao topo
 ```
 
 **WASM:**

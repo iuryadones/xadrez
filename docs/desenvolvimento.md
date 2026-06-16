@@ -31,7 +31,8 @@ src/
 ├── moves.rs       ← Geração de movimentos legais + Perft
 ├── game.rs        ← Game state, make_move, undo, status
 ├── fen.rs         ← Parse/serialize FEN
-└── notation.rs    ← Notação algébrica (move_to_algebraic, parse_algebraic)
+├── notation.rs    ← Notação algébrica (move_to_algebraic, parse_algebraic)
+└── ai.rs          ← Engine AI: Negamax + TT + Zobrist + Quiescence + PST
 ```
 
 A biblioteca tem **zero dependências externas** — apenas Rust std.

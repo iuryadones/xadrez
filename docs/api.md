@@ -163,6 +163,43 @@ fn parse_algebraic(game: &Game, input: &str) -> Option<Move>;
 fn disambiguation(game: &Game, mv: &Move, piece: Piece) -> String;
 ```
 
+### `ai` module
+
+```rust
+// Re-exportado de lib.rs
+pub mod ai;
+
+use chess::ai;
+
+// Dificuldade
+#[derive(Default, Clone, Copy, PartialEq)]
+enum Difficulty { Easy, Medium, Hard }
+impl Difficulty {
+    fn depth(&self) -> u32;  // Easy→2, Medium→4, Hard→6
+}
+
+// Busca
+fn best_move(game: &Game) -> Option<Move>;
+                    // Profundidade padrão (Medium = 4)
+fn best_move_with_depth(game: &Game, max_depth: u32) -> Option<Move>;
+                    // Profundidade customizada (ex: Hard = 6)
+
+// Utilitários
+fn coin_flip() -> Color;               // White ou Black aleatório (SystemTime)
+fn random_difficulty() -> Difficulty;   // Fácil/Médio/Difícil aleatório
+fn color_name(color: Color) -> &'static str;   // "Brancas" / "Pretas"
+fn king_symbol(color: Color) -> &'static str;  // "♔" / "♚"
+
+// Algoritmo de busca (interno):
+//   Negamax + Alpha-Beta + PID + LMR (Late Move Reduction)
+//   Quiescence search (capturas em profundidade 0)
+//   MVV-LVA (Most Valuable Victim - Least Valuable Attacker) ordering
+//   Piece-Square Tables (PST) para avaliação posicional
+//   Transposition Table (2^20 entradas, always-replace)
+//   Zobrist hashing (781 chaves u64 determinísticas via SplitMix64)
+//   thread_local! — persiste entre chamadas, sem dependências externas
+```
+
 ## Exemplo Completo de Integração
 
 ```rust

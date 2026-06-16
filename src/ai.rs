@@ -7,10 +7,29 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 const INF: i32 = 1_000_000_000;
 
-const PIECE_VALUES: [i32; 6] = [100, 320, 330, 500, 900, 20000];
+const PIECE_VALUES: [i32; 6] = [20000, 900, 500, 330, 320, 100];
 
 fn piece_value(kind: PieceType) -> i32 {
     PIECE_VALUES[kind as usize]
+}
+
+struct SplitMix64 {
+    state: u64,
+}
+
+impl SplitMix64 {
+    fn new(seed: u64) -> Self {
+        Self { state: seed }
+    }
+    fn next(&mut self) -> u64 {
+        self.state = self.state.wrapping_add(0x9e3779b97f4a7c15);
+        let mut z = self.state;
+        z = z.wrapping_mul(0xbf58476d1ce4e5b9);
+        z ^= z >> 30;
+        z = z.wrapping_mul(0x94d049bb133111eb);
+        z ^= z >> 27;
+        z
+    }
 }
 
 const PST_PAWN: [i32; 64] = [
@@ -80,8 +99,58 @@ const PST_KING: [i32; 64] = [
 ];
 
 const PST: [&[i32; 64]; 6] = [
-    &PST_PAWN, &PST_KNIGHT, &PST_BISHOP, &PST_ROOK, &PST_QUEEN, &PST_KING,
+    &PST_KING, &PST_QUEEN, &PST_ROOK, &PST_BISHOP, &PST_KNIGHT, &PST_PAWN,
 ];
+
+use std::sync::OnceLock;
+
+struct Zobrist {
+    pieces: [[[u64; 2]; 64]; 6],
+    side: u64,
+    castling: [u64; 4],
+    ep: [u64; 8],
+}
+
+static ZOBRIST: OnceLock<Zobrist> = OnceLock::new();
+
+fn zobrist() -> &'static Zobrist {
+    ZOBRIST.get_or_init(|| {
+        let mut rng = SplitMix64::new(42);
+        let mut rand_u64 = || rng.next();
+        Zobrist {
+            pieces: [[[rand_u64(); 2]; 64]; 6],
+            side: rand_u64(),
+            castling: [rand_u64(), rand_u64(), rand_u64(), rand_u64()],
+            ep: [rand_u64(), rand_u64(), rand_u64(), rand_u64(), rand_u64(), rand_u64(), rand_u64(), rand_u64()],
+        }
+    })
+}
+
+fn compute_hash(game: &Game) -> u64 {
+    let zb = zobrist();
+    let mut h = 0u64;
+    for rank in 0..8 {
+        for file in 0..8 {
+            let sq = Square::new_unchecked(file, rank);
+            if let Some(piece) = game.board().piece_at(sq) {
+                let idx = rank * 8 + file;
+                h ^= zb.pieces[piece.kind as usize][idx][piece.color as usize];
+            }
+        }
+    }
+    if game.turn() == Color::Black {
+        h ^= zb.side;
+    }
+    let cr = game.castling_rights();
+    if cr.white_kingside { h ^= zb.castling[0]; }
+    if cr.white_queenside { h ^= zb.castling[1]; }
+    if cr.black_kingside { h ^= zb.castling[2]; }
+    if cr.black_queenside { h ^= zb.castling[3]; }
+    if let Some(ep) = game.ep_target() {
+        h ^= zb.ep[ep.file];
+    }
+    h
+}
 
 fn pst_bonus(kind: PieceType, sq: Square, color: Color) -> i32 {
     let table = PST[kind as usize];
@@ -114,6 +183,74 @@ fn evaluate_board(board: &Board, color: Color) -> i32 {
 fn evaluate(game: &Game) -> i32 {
     evaluate_board(game.board(), game.turn())
         - evaluate_board(game.board(), game.turn().opponent())
+}
+
+use std::cell::RefCell;
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum TTFlag {
+    Exact,
+    LowerBound,
+    UpperBound,
+}
+
+#[derive(Clone, Copy)]
+struct TTEntry {
+    hash: u64,
+    depth: u32,
+    score: i32,
+    flag: TTFlag,
+    best_move: Option<Move>,
+}
+
+struct TranspositionTable {
+    entries: Box<[Option<TTEntry>]>,
+    mask: usize,
+}
+
+impl TranspositionTable {
+    fn new() -> Self {
+        let size = 1 << 20;
+        Self {
+            entries: vec![None; size].into_boxed_slice(),
+            mask: size - 1,
+        }
+    }
+    fn index(&self, hash: u64) -> usize {
+        (hash as usize) & self.mask
+    }
+    fn probe(&self, hash: u64, depth: u32, alpha: i32, beta: i32) -> (Option<(i32, TTFlag)>, Option<Move>) {
+        match self.entries[self.index(hash)].as_ref() {
+            Some(entry) if entry.hash == hash => {
+                let best = entry.best_move;
+                if entry.depth >= depth {
+                    match entry.flag {
+                        TTFlag::Exact => (Some((entry.score, TTFlag::Exact)), best),
+                        TTFlag::LowerBound if entry.score >= beta => (Some((entry.score, TTFlag::LowerBound)), best),
+                        TTFlag::UpperBound if entry.score <= alpha => (Some((entry.score, TTFlag::UpperBound)), best),
+                        _ => (None, best),
+                    }
+                } else {
+                    (None, best)
+                }
+            }
+            _ => (None, None),
+        }
+    }
+    fn record(&mut self, hash: u64, depth: u32, score: i32, flag: TTFlag, best_move: Option<Move>) {
+        let idx = self.index(hash);
+        self.entries[idx] = Some(TTEntry { hash, depth, score, flag, best_move });
+    }
+    #[allow(dead_code)]
+    fn clear(&mut self) {
+        for e in self.entries.iter_mut() {
+            *e = None;
+        }
+    }
+}
+
+thread_local! {
+    static TT: RefCell<TranspositionTable> = RefCell::new(TranspositionTable::new());
 }
 
 fn is_capture(game: &Game, mv: &Move) -> bool {
@@ -195,38 +332,61 @@ fn quiescence(game: &Game, alpha: i32, beta: i32, color: Color) -> i32 {
 }
 
 fn negamax(
+    tt: &mut TranspositionTable,
     game: &Game,
     depth: u32,
     alpha: i32,
     beta: i32,
     color: Color,
 ) -> i32 {
+    let hash = compute_hash(game);
+    let (tt_result, tt_move) = tt.probe(hash, depth, alpha, beta);
+    if let Some((score, _flag)) = tt_result {
+        return score;
+    }
+
     if depth == 0 {
-        return quiescence(game, alpha, beta, color);
+        let score = quiescence(game, alpha, beta, color);
+        tt.record(hash, 0, score, TTFlag::Exact, None);
+        return score;
     }
 
     if game.status() != crate::GameStatus::Ongoing {
-        return if game.status() == crate::GameStatus::WhiteWins {
-            if color == Color::White { INF - 1 } else { -INF + 1 }
-        } else if game.status() == crate::GameStatus::BlackWins {
-            if color == Color::Black { INF - 1 } else { -INF + 1 }
-        } else {
-            0
+        let score = match game.status() {
+            crate::GameStatus::WhiteWins => {
+                if color == Color::White { INF - 1 } else { -INF + 1 }
+            }
+            crate::GameStatus::BlackWins => {
+                if color == Color::Black { INF - 1 } else { -INF + 1 }
+            }
+            _ => 0,
         };
+        tt.record(hash, depth, score, TTFlag::Exact, None);
+        return score;
     }
 
     let mut moves = game.legal_moves();
     if moves.is_empty() {
-        return if game.in_check() {
+        let score = if game.in_check() {
             -INF + 2
         } else {
             0
         };
+        tt.record(hash, depth, score, TTFlag::Exact, None);
+        return score;
+    }
+
+    if let Some(bm) = tt_move {
+        if let Some(pos) = moves.iter().position(|m| *m == bm) {
+            moves.swap(0, pos);
+        }
     }
 
     order_moves(game, &mut moves);
 
     let mut alpha = alpha;
+    let original_alpha = alpha;
+    let mut best_move: Option<Move> = None;
     let mut searched = 0;
 
     for mv in moves {
@@ -236,26 +396,35 @@ fn negamax(
         }
         let score;
         if searched == 0 {
-            score = -negamax(&g, depth - 1, -beta, -alpha, color.opponent());
+            score = -negamax(tt, &g, depth - 1, -beta, -alpha, color.opponent());
         } else {
-            let mut s = -negamax(&g, depth - 1, -alpha - 1, -alpha, color.opponent());
+            let mut s = -negamax(tt, &g, depth - 1, -alpha - 1, -alpha, color.opponent());
             if s > alpha && s < beta {
-                s = -negamax(&g, depth - 1, -beta, -alpha, color.opponent());
+                s = -negamax(tt, &g, depth - 1, -beta, -alpha, color.opponent());
             }
             score = s;
         }
         searched += 1;
         if score >= beta {
+            tt.record(hash, depth, beta, TTFlag::LowerBound, best_move);
             return beta;
         }
         if score > alpha {
             alpha = score;
+            best_move = Some(mv);
         }
     }
+
+    let flag = if alpha <= original_alpha {
+        TTFlag::UpperBound
+    } else {
+        TTFlag::Exact
+    };
+    tt.record(hash, depth, alpha, flag, best_move);
     alpha
 }
 
-fn iterative_deepening(game: &Game, max_depth: u32) -> Option<Move> {
+fn iterative_deepening(tt: &mut TranspositionTable, game: &Game, max_depth: u32) -> Option<Move> {
     let mut best_move: Option<Move> = None;
     let mut _best_score: i32 = -INF + 1;
     let color = game.turn();
@@ -266,10 +435,11 @@ fn iterative_deepening(game: &Game, max_depth: u32) -> Option<Move> {
             break;
         }
 
-        if let Some(ref bm) = best_move {
-            let idx = moves.iter().position(|m| m == bm);
-            if let Some(i) = idx {
-                moves.swap(0, i);
+        let hash = compute_hash(game);
+        let (_tt_result, tt_move) = tt.probe(hash, 0, -INF, INF);
+        if let Some(bm) = tt_move.or(best_move) {
+            if let Some(pos) = moves.iter().position(|m| *m == bm) {
+                moves.swap(0, pos);
             }
         }
 
@@ -285,7 +455,7 @@ fn iterative_deepening(game: &Game, max_depth: u32) -> Option<Move> {
             if g.make_move(mv).is_err() {
                 continue;
             }
-            let score = -negamax(&g, depth - 1, -beta, -alpha, color.opponent());
+            let score = -negamax(tt, &g, depth - 1, -beta, -alpha, color.opponent());
             if score > current_score {
                 current_score = score;
                 current_best = Some(mv);
@@ -323,11 +493,11 @@ impl Difficulty {
 }
 
 pub fn best_move(game: &Game) -> Option<Move> {
-    iterative_deepening(game, Difficulty::default().depth())
+    TT.with(|tt| iterative_deepening(&mut tt.borrow_mut(), game, Difficulty::default().depth()))
 }
 
 pub fn best_move_with_depth(game: &Game, max_depth: u32) -> Option<Move> {
-    iterative_deepening(game, max_depth)
+    TT.with(|tt| iterative_deepening(&mut tt.borrow_mut(), game, max_depth))
 }
 
 pub fn coin_flip() -> Color {

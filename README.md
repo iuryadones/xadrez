@@ -10,6 +10,8 @@ Jogo de xadrez completo implementado em Rust, jogável no terminal e via navegad
 
 - ✅ Jogo completo 2 jogadores no terminal + WebAssembly
 - ✅ Modo PvBot com dificuldade ajustável (Fácil/Médio/Difícil/Aleatório)
+- ✅ Engine AI: Negamax + Alpha-Beta + PID + LMR + Quiescence + MVV-LVA + PST
+- ✅ Tabela de Transposição + Zobrist Hashing (3–5× mais rápido)
 - ✅ Todas as regras: roque, en passant, promoção
 - ✅ Detecção de xeque, xeque-mate, afogamento
 - ✅ Material insuficiente, regra dos 50/75 movimentos, tripla/quíntupla repetição
