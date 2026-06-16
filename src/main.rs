@@ -7,14 +7,20 @@ const BG_DARK: &str = "\x1b[40m";
 const FG_DARK: &str = "\x1b[30m";
 const FG_LIGHT: &str = "\x1b[97m";
 
-
 fn main() {
     let mut game = Game::new();
     let stdin = io::stdin();
     let mut stdout = io::stdout();
 
+    let bot_color = ai::coin_flip();
+    let player_color = bot_color.opponent();
+
     println!("╔══════════════════════════════════╗");
     println!("║        ♔ XADREZ RUST ♚          ║");
+    println!("╠══════════════════════════════════╣");
+    println!("║  Modo: Jogador vs Computador     ║");
+    println!("║  Você joga de {}                   ║", ai::color_name(player_color));
+    println!("║  Computador joga de {}            ║", ai::color_name(bot_color));
     println!("╠══════════════════════════════════╣");
     println!("║ Comandos:                       ║");
     println!("║  e4, Nf3, O-O   → jogada        ║");
@@ -42,6 +48,23 @@ fn main() {
                 println!("Empate!");
                 break;
             }
+        }
+
+        if game.turn() == bot_color {
+            print!("  {} pensando...", ai::piece_name(bot_color));
+            stdout.flush().unwrap();
+
+            match ai::best_move(&game) {
+                Some(mv) => {
+                    let alg = move_to_algebraic(&game, &mv);
+                    println!("\r  {} jogou {}  ", ai::piece_name(bot_color), alg);
+                    game.make_move(mv).ok();
+                }
+                None => {
+                    println!("\r  {} sem jogadas legais.", ai::piece_name(bot_color));
+                }
+            }
+            continue;
         }
 
         let player = match game.turn() {
