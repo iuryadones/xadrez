@@ -7,29 +7,95 @@ const BG_DARK: &str = "\x1b[40m";
 const FG_DARK: &str = "\x1b[30m";
 const FG_LIGHT: &str = "\x1b[97m";
 
-fn main() {
-    let mut game = Game::new();
-    let stdin = io::stdin();
-    let mut stdout = io::stdout();
+enum Mode {
+    PvBot,
+    PvP,
+}
 
-    let bot_color = ai::coin_flip();
-    let player_color = bot_color.opponent();
+fn read_line() -> String {
+    let mut input = String::new();
+    io::stdin().lock().read_line(&mut input).ok();
+    input.trim().to_string()
+}
 
+fn choose_mode() -> Mode {
+    loop {
+        println!("╔══════════════════════════════════╗");
+        println!("║        ♔ XADREZ RUST ♚          ║");
+        println!("╠══════════════════════════════════╣");
+        println!("║  Modo de jogo:                   ║");
+        println!("║  1. Jogador vs Computador        ║");
+        println!("║  2. Jogador vs Jogador           ║");
+        println!("╚══════════════════════════════════╝");
+        print!("  Escolha: ");
+        io::stdout().flush().unwrap();
+        match read_line().as_str() {
+            "1" => return Mode::PvBot,
+            "2" => return Mode::PvP,
+            _ => {
+                println!("  Opcao invalida. Digite 1 ou 2.\n");
+            }
+        }
+    }
+}
+
+fn choose_difficulty() -> ai::Difficulty {
+    loop {
+        println!("\n╔══════════════════════════════════╗");
+        println!("║        ♔ XADREZ RUST ♚          ║");
+        println!("╠══════════════════════════════════╣");
+        println!("║  Dificuldade do bot:             ║");
+        println!("║  1. Fácil                        ║");
+        println!("║  2. Médio                        ║");
+        println!("║  3. Difícil                      ║");
+        println!("║  4. Aleatório                    ║");
+        println!("╚══════════════════════════════════╝");
+        print!("  Escolha: ");
+        io::stdout().flush().unwrap();
+        match read_line().as_str() {
+            "1" => return ai::Difficulty::Easy,
+            "2" => return ai::Difficulty::Medium,
+            "3" => return ai::Difficulty::Hard,
+            "4" => return ai::random_difficulty(),
+            _ => {
+                println!("  Opcao invalida. Digite 1 a 4.");
+            }
+        }
+    }
+}
+
+fn show_banner() {
     println!("╔══════════════════════════════════╗");
     println!("║        ♔ XADREZ RUST ♚          ║");
     println!("╠══════════════════════════════════╣");
-    println!("║  Modo: Jogador vs Computador     ║");
-    println!("║  Você joga de {}                   ║", ai::color_name(player_color));
-    println!("║  Computador joga de {}            ║", ai::color_name(bot_color));
-    println!("╠══════════════════════════════════╣");
-    println!("║ Comandos:                       ║");
+    println!("║ Comandos:                        ║");
     println!("║  e4, Nf3, O-O   → jogada        ║");
-    println!("║  moves          → jogadas legais║");
-    println!("║  fen            → mostrar FEN   ║");
-    println!("║  undo           → desfazer      ║");
-    println!("║  quit/exit      → sair          ║");
+    println!("║  moves          → jogadas legais ║");
+    println!("║  fen            → mostrar FEN    ║");
+    println!("║  undo           → desfazer       ║");
+    println!("║  quit/exit      → sair           ║");
     println!("╚══════════════════════════════════╝");
     println!();
+}
+
+fn main() {
+    match choose_mode() {
+        Mode::PvP => run_pvp(),
+        Mode::PvBot => {
+            let difficulty = choose_difficulty();
+            run_pvbot(difficulty);
+        }
+    }
+}
+
+fn game_loop<F>(on_turn: F)
+where
+    F: Fn(&mut Game, &mut dyn Write) -> bool,
+{
+    let mut game = Game::new();
+    let mut stdout = io::stdout();
+
+    show_banner();
 
     loop {
         render(&game);
@@ -37,36 +103,27 @@ fn main() {
         match game.status() {
             GameStatus::Ongoing => {}
             GameStatus::WhiteWins => {
-                println!("♔ XEQUE-MATE! Brancas venceram!");
+                println!("  ♔ XEQUE-MATE! Brancas venceram!");
                 break;
             }
             GameStatus::BlackWins => {
-                println!("♚ XEQUE-MATE! Pretas venceram!");
+                println!("  ♚ XEQUE-MATE! Pretas venceram!");
                 break;
             }
             GameStatus::Draw => {
-                println!("Empate!");
+                println!("  Empate!");
                 break;
             }
         }
 
-        if game.turn() == bot_color {
-            print!("  {} pensando...", ai::piece_name(bot_color));
-            stdout.flush().unwrap();
-
-            match ai::best_move(&game) {
-                Some(mv) => {
-                    let alg = move_to_algebraic(&game, &mv);
-                    println!("\r  {} jogou {}  ", ai::piece_name(bot_color), alg);
-                    game.make_move(mv).ok();
-                }
-                None => {
-                    println!("\r  {} sem jogadas legais.", ai::piece_name(bot_color));
-                }
-            }
-            continue;
+        if !on_turn(&mut game, &mut stdout) {
+            break;
         }
+    }
+}
 
+fn run_pvp() {
+    game_loop(|game, stdout| {
         let player = match game.turn() {
             Color::White => "Brancas",
             Color::Black => "Pretas",
@@ -78,48 +135,100 @@ fn main() {
         print!("{}: ", player);
         stdout.flush().unwrap();
 
-        let mut input = String::new();
-        if stdin.lock().read_line(&mut input).is_err() {
-            break;
-        }
-        let input = input.trim();
+        handle_player_input(game)
+    });
+}
 
-        match input {
-            "quit" | "exit" | "q" => break,
-            "moves" | "mov" => {
-                show_legal_moves(&game);
-                continue;
-            }
-            "fen" => {
-                println!("{}", game.to_fen());
-                continue;
-            }
-            "undo" => {
-                if !game.undo() {
-                    println!("  Nada para desfazer.");
-                }
-                continue;
-            }
-            "help" | "h" => {
-                show_help();
-                continue;
-            }
-            "" => continue,
-            _ => {}
-        }
+fn run_pvbot(difficulty: ai::Difficulty) {
+    let bot_color = ai::coin_flip();
+    let player_color = bot_color.opponent();
 
-        match parse_algebraic(&game, input) {
-            Some(mv) => match game.make_move(mv) {
-                Ok(()) => {}
-                Err(e) => {
-                    println!("  Erro: {}", e);
+    let diff_name = match difficulty {
+        ai::Difficulty::Easy => "Fácil",
+        ai::Difficulty::Medium => "Médio",
+        ai::Difficulty::Hard => "Difícil",
+    };
+
+    println!(
+        "  Você joga de {} | Bot joga de {} ({})",
+        ai::color_name(player_color),
+        ai::color_name(bot_color),
+        diff_name,
+    );
+    println!();
+
+    game_loop(|game, stdout| {
+        if game.turn() == bot_color {
+            print!("  {} pensando...", ai::piece_name(bot_color));
+            stdout.flush().unwrap();
+
+            match ai::best_move_with_depth(game, difficulty.depth()) {
+                Some(mv) => {
+                    let alg = move_to_algebraic(game, &mv);
+                    println!("\r  {} jogou {}  ", ai::piece_name(bot_color), alg);
+                    game.make_move(mv).ok();
                 }
-            },
-            None => {
-                println!("  Jogada invalida. Digite 'moves' para ver as jogadas possiveis.");
+                None => {
+                    println!("\r  {} sem jogadas legais.", ai::piece_name(bot_color));
+                }
             }
+            true
+        } else {
+            let player = match game.turn() {
+                Color::White => "Brancas",
+                Color::Black => "Pretas",
+            };
+
+            if game.in_check() {
+                print!("  XEQUE! ");
+            }
+            print!("{}: ", player);
+            stdout.flush().unwrap();
+
+            handle_player_input(game)
+        }
+    });
+}
+
+fn handle_player_input(game: &mut Game) -> bool {
+    let input = read_line();
+
+    match input.as_str() {
+        "quit" | "exit" | "q" => return false,
+        "moves" | "mov" => {
+            show_legal_moves(game);
+            return true;
+        }
+        "fen" => {
+            println!("  {}", game.to_fen());
+            return true;
+        }
+        "undo" => {
+            if !game.undo() {
+                println!("  Nada para desfazer.");
+            }
+            return true;
+        }
+        "help" | "h" => {
+            show_help();
+            return true;
+        }
+        "" => return true,
+        _ => {}
+    }
+
+    match parse_algebraic(game, &input) {
+        Some(mv) => match game.make_move(mv) {
+            Ok(()) => {}
+            Err(e) => {
+                println!("  Erro: {}", e);
+            }
+        },
+        None => {
+            println!("  Jogada invalida. Digite 'moves' para ver as jogadas possiveis.");
         }
     }
+    true
 }
 
 fn render(game: &Game) {

@@ -314,7 +314,7 @@ pub enum Difficulty {
 }
 
 impl Difficulty {
-    fn depth(&self) -> u32 {
+    pub fn depth(&self) -> u32 {
         match self {
             Difficulty::Easy => 2,
             Difficulty::Medium => 4,
@@ -332,14 +332,25 @@ pub fn best_move_with_depth(game: &Game, max_depth: u32) -> Option<Move> {
 }
 
 pub fn coin_flip() -> Color {
-    let nanos = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|d| d.subsec_nanos())
-        .unwrap_or(0);
-    if nanos % 2 == 0 {
+    if nanos() % 2 == 0 {
         Color::White
     } else {
         Color::Black
+    }
+}
+
+fn nanos() -> u32 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.subsec_nanos())
+        .unwrap_or(0)
+}
+
+pub fn random_difficulty() -> Difficulty {
+    match nanos() % 3 {
+        0 => Difficulty::Easy,
+        1 => Difficulty::Medium,
+        _ => Difficulty::Hard,
     }
 }
 
