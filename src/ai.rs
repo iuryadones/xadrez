@@ -304,7 +304,7 @@ fn iterative_deepening(game: &Game, max_depth: u32) -> Option<Move> {
     best_move
 }
 
-#[derive(Default)]
+#[derive(Default, Clone, Copy, PartialEq)]
 pub enum Difficulty {
     Easy,
     #[default]

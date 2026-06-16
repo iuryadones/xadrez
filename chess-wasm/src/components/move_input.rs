@@ -1,7 +1,7 @@
 use chess::*;
 use yew::prelude::*;
 
-use crate::state::{GameState, GameAction};
+use crate::state::{GameAction, GameState, Mode};
 
 #[derive(Properties, PartialEq)]
 pub struct MoveInputProps {
@@ -16,6 +16,9 @@ pub fn MoveInput(props: &MoveInputProps) -> Html {
         let state = props.state.clone();
         let input_ref = input_ref.clone();
         Callback::from(move |_: MouseEvent| {
+            if state.mode == Some(Mode::PvBot) && Some(state.game.turn()) == state.bot_color {
+                return;
+            }
             if let Some(input) = input_ref.cast::<web_sys::HtmlInputElement>() {
                 let val = input.value();
                 input.set_value("");
@@ -30,6 +33,9 @@ pub fn MoveInput(props: &MoveInputProps) -> Html {
         let state = props.state.clone();
         let input_ref = input_ref.clone();
         Callback::from(move |e: KeyboardEvent| {
+            if state.mode == Some(Mode::PvBot) && Some(state.game.turn()) == state.bot_color {
+                return;
+            }
             if e.key() == "Enter" {
                 if let Some(input) = input_ref.cast::<web_sys::HtmlInputElement>() {
                     let val = input.value();
@@ -42,13 +48,17 @@ pub fn MoveInput(props: &MoveInputProps) -> Html {
         })
     };
 
+    let is_bot_turn = props.state.mode == Some(Mode::PvBot)
+        && Some(props.state.game.turn()) == props.state.bot_color;
+
     html! {
         <div class="move-input-row">
             <input ref={input_ref}
                 placeholder="e4, Nf3, O-O..."
+                disabled={is_bot_turn}
                 onkeypress={on_keypress}
             />
-            <button onclick={on_submit}>{ "Jogar" }</button>
+            <button disabled={is_bot_turn} onclick={on_submit}>{ "Jogar" }</button>
         </div>
     }
 }

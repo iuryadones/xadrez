@@ -292,3 +292,96 @@ body {
     background: #333;
     color: #fff;
 }
+
+.overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+}
+
+.selector-dialog {
+    background: #1a1a1a;
+    border: 2px solid #555;
+    border-radius: 12px;
+    padding: 2rem;
+    text-align: center;
+    min-width: 320px;
+    max-width: 90vw;
+}
+
+.selector-title {
+    font-size: 1.3rem;
+    margin-bottom: 0.25rem;
+    color: #ffd700;
+}
+
+.selector-subtitle {
+    font-size: 0.95rem;
+    color: #aaa;
+    margin-bottom: 1.5rem;
+}
+
+.selector-options {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    align-items: stretch;
+}
+
+.selector-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 1rem;
+    border: 2px solid #555;
+    border-radius: 8px;
+    background: #2a2a2a;
+    color: #fff;
+    cursor: pointer;
+    transition: border-color 0.15s, background 0.15s;
+    font-size: 1rem;
+}
+
+.selector-btn:hover {
+    border-color: #7fc97f;
+    background: #333;
+}
+
+.selector-btn-icon {
+    font-size: 1.5rem;
+}
+
+.selector-btn-label {
+    font-weight: bold;
+}
+
+.selector-btn-desc {
+    font-size: 0.8rem;
+    color: #888;
+}
+
+.selector-back {
+    margin-top: 1rem;
+    padding: 0.5rem 1.5rem;
+    border: 1px solid #555;
+    border-radius: 6px;
+    background: transparent;
+    color: #aaa;
+    cursor: pointer;
+    font-size: 0.9rem;
+}
+
+.selector-back:hover {
+    background: #333;
+    color: #fff;
+}
+
+input:disabled, button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}

@@ -8,6 +8,8 @@ mod new_game;
 mod undo_button;
 mod fen_display;
 mod promotion_dialog;
+mod mode_selector;
+mod difficulty_selector;
 
 pub use chess_board::ChessBoard;
 pub use status_bar::StatusBar;
@@ -17,3 +19,5 @@ pub use new_game::NewGame;
 pub use undo_button::UndoButton;
 pub use fen_display::FenDisplay;
 pub use promotion_dialog::PromotionDialog;
+pub use mode_selector::ModeSelector;
+pub use difficulty_selector::DifficultySelector;

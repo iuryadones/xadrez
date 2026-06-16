@@ -1,11 +1,19 @@
 use yew::prelude::*;
 
 use crate::components::*;
-use crate::state::GameState;
+use crate::state::{GameState, Mode};
 
 #[function_component]
 pub fn App() -> Html {
     let state = use_reducer(GameState::default);
+
+    if state.mode.is_none() {
+        return html! { <ModeSelector state={state.clone()} /> };
+    }
+
+    if state.mode == Some(Mode::PvBot) && state.difficulty.is_none() {
+        return html! { <DifficultySelector state={state.clone()} /> };
+    }
 
     let promotion_dialog = if state.pending_promotion.is_some() {
         html! { <PromotionDialog state={state.clone()} /> }
