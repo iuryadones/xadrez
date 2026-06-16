@@ -7,7 +7,7 @@ pub struct NewGameProps {
     pub state: yew::UseReducerHandle<GameState>,
 }
 
- #[function_component]
+#[function_component]
 pub fn NewGame(props: &NewGameProps) -> Html {
     let onclick = {
         let state = props.state.clone();

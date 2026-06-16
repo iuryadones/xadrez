@@ -1,7 +1,7 @@
 use chess::ai::{self, Difficulty};
 use yew::prelude::*;
 
-use crate::state::{GameAction, GameState};
+use crate::state::{GameAction, GameState, Mode};
 
 #[derive(Properties, PartialEq)]
 pub struct DifficultySelectorProps {
@@ -37,7 +37,7 @@ pub fn DifficultySelector(props: &DifficultySelectorProps) -> Html {
     let on_back = {
         let state = props.state.clone();
         Callback::from(move |_: MouseEvent| {
-            state.dispatch(GameAction::SetMode(crate::state::Mode::PvBot));
+            state.dispatch(GameAction::SetMode(Mode::PvBot));
         })
     };
 
