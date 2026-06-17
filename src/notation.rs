@@ -264,12 +264,13 @@ fn try_parse_algebraic_move(game: &Game, input: &str) -> Option<Move> {
 
     for mv in &candidates {
         let from = mv.from;
-        if disambig.len() == 1 {
-            let c = disambig.chars().next().unwrap();
+        if let Some(c) = disambig.chars().next() {
             if c.is_ascii_digit() {
-                let rank = c.to_digit(10).unwrap() as usize - 1;
-                if from.rank == rank {
-                    return Some(*mv);
+                if let Some(digit) = c.to_digit(10) {
+                    let rank = digit as usize - 1;
+                    if from.rank == rank {
+                        return Some(*mv);
+                    }
                 }
             } else {
                 let file = (c as u8 - b'a') as usize;

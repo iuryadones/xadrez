@@ -1,7 +1,7 @@
 use chess::ai::Difficulty;
 use yew::prelude::*;
 
-use crate::state::{GameAction, GameState, Mode};
+use crate::state::{GameAction, GameState};
 
 #[derive(Properties, PartialEq)]
 pub struct DifficultySelectorProps {
@@ -43,7 +43,7 @@ pub fn DifficultySelector(props: &DifficultySelectorProps) -> Html {
     let on_back = {
         let state = props.state.clone();
         Callback::from(move |_: MouseEvent| {
-            state.dispatch(GameAction::SetMode(Mode::PvBot));
+            state.dispatch(GameAction::BackToModeSelect);
         })
     };
 
@@ -62,7 +62,7 @@ pub fn DifficultySelector(props: &DifficultySelectorProps) -> Html {
                     </button>
                     <button class="selector-btn" onclick={on_hard}>
                         <span class="selector-btn-label">{ "Dif\u{00ED}cil" }</span>
-                        <span class="selector-btn-desc">{ "Profundidade 6" }</span>
+                        <span class="selector-btn-desc">{ "Profundidade 7" }</span>
                     </button>
                     <button class="selector-btn" onclick={on_random}>
                         <span class="selector-btn-label">{ "Aleat\u{00F3}rio" }</span>

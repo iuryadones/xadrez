@@ -1,3 +1,6 @@
+#![deny(warnings)]
+#![deny(clippy::all)]
+
 mod app;
 mod components;
 mod render;

@@ -29,7 +29,8 @@ pub fn StatusBar(props: &StatusBarProps) -> Html {
     let (text, class) = match status {
         GameStatus::Ongoing => {
             if props.state.mode == Some(Mode::PvBot) {
-                let you = if game.turn() == props.state.bot_color.unwrap() {
+                let bot_color = props.state.bot_color.unwrap_or(Color::White);
+                let you = if game.turn() == bot_color {
                     "Bot".to_string()
                 } else {
                     "Voc\u{00EA}".to_string()

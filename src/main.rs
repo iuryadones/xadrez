@@ -1,3 +1,6 @@
+#![deny(warnings)]
+#![deny(clippy::all)]
+
 use chess::*;
 use std::io::{self, BufRead, Write};
 

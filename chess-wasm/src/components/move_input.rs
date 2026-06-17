@@ -9,8 +9,8 @@ pub struct MoveInputProps {
 }
 
 fn can_move(state: &GameState) -> bool {
-    !state.bot_pending
-        && !(state.mode == Some(Mode::PvBot) && Some(state.game.turn()) == state.bot_color)
+    !(state.bot_pending
+        || state.mode == Some(Mode::PvBot) && Some(state.game.turn()) == state.bot_color)
 }
 
 #[function_component]

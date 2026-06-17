@@ -1,6 +1,5 @@
 use chess::*;
 use chess::ai::Difficulty;
-use js_sys;
 use yew::Reducible;
 
 #[derive(Clone, PartialEq, Copy)]
@@ -35,6 +34,7 @@ pub enum GameAction {
     SetMode(Mode),
     SetDifficulty(Difficulty),
     BotMove(Move),
+    BackToModeSelect,
 }
 
 fn wasm_coin_flip() -> Color {
@@ -195,6 +195,16 @@ impl Reducible for GameState {
             }
             GameAction::CancelPromotion => {
                 next.pending_promotion = None;
+            }
+            GameAction::BackToModeSelect => {
+                next.mode = None;
+                next.difficulty = None;
+                next.bot_color = None;
+                next.bot_pending = false;
+                next.selected = None;
+                next.legal_moves_for_selected = Vec::new();
+                next.pending_promotion = None;
+                next.input_error = false;
             }
         }
         std::rc::Rc::new(next)

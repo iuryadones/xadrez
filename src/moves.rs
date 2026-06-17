@@ -36,11 +36,9 @@ pub fn legal_moves(
     ep_target: Option<Square>,
     castling: &CastlingRights,
 ) -> Vec<Move> {
-    let pseudo = pseudo_legal_moves(board, color, ep_target, castling);
-    pseudo
-        .into_iter()
-        .filter(|mv| is_legal(board, mv, color))
-        .collect()
+    let mut moves = pseudo_legal_moves(board, color, ep_target, castling);
+    moves.retain(|mv| is_legal(board, mv, color));
+    moves
 }
 
 pub fn is_square_attacked(board: &Board, square: Square, by_color: Color) -> bool {
@@ -112,13 +110,14 @@ pub fn is_square_attacked(board: &Board, square: Square, by_color: Color) -> boo
     false
 }
 
-fn pseudo_legal_moves(
+#[doc(hidden)]
+pub fn pseudo_legal_moves(
     board: &Board,
     color: Color,
     ep_target: Option<Square>,
     castling: &CastlingRights,
 ) -> Vec<Move> {
-    let mut moves = Vec::new();
+    let mut moves = Vec::with_capacity(64);
 
     for rank in 0..8 {
         for file in 0..8 {
@@ -188,9 +187,10 @@ fn add_pawn_moves(
 
     if from.rank == start_rank {
         if let Some(to) = from.offset(0, forward * 2) {
-            let mid = from.offset(0, forward).unwrap();
-            if board.piece_at(to).is_none() && board.piece_at(mid).is_none() {
-                moves.push(Move::new(from, to));
+            if let Some(mid) = from.offset(0, forward) {
+                if board.piece_at(to).is_none() && board.piece_at(mid).is_none() {
+                    moves.push(Move::new(from, to));
+                }
             }
         }
     }
@@ -333,6 +333,133 @@ fn add_castling_moves(
     }
 }
 
+fn add_pawn_quiescence(
+    board: &Board,
+    from: Square,
+    color: Color,
+    ep_target: Option<Square>,
+    moves: &mut Vec<Move>,
+) {
+    let (forward, promote_rank) = match color {
+        Color::White => (1, 7),
+        Color::Black => (-1, 0),
+    };
+    for df in [-1, 1] {
+        if let Some(to) = from.offset(df, forward) {
+            if let Some(p) = board.piece_at(to) {
+                if p.color != color {
+                    if to.rank == promote_rank {
+                        for &promo in &[PieceType::Queen, PieceType::Rook, PieceType::Bishop, PieceType::Knight] {
+                            moves.push(Move::new_promotion(from, to, promo));
+                        }
+                    } else {
+                        moves.push(Move::new(from, to));
+                    }
+                }
+            }
+            if let Some(ep) = ep_target {
+                if to == ep {
+                    moves.push(Move::new(from, to));
+                }
+            }
+        }
+    }
+    if let Some(to) = from.offset(0, forward) {
+        if board.piece_at(to).is_none() && to.rank == promote_rank {
+            for &promo in &[PieceType::Queen, PieceType::Rook, PieceType::Bishop, PieceType::Knight] {
+                moves.push(Move::new_promotion(from, to, promo));
+            }
+        }
+    }
+}
+
+fn add_knight_captures(board: &Board, from: Square, color: Color, moves: &mut Vec<Move>) {
+    for &(df, dr) in &KNIGHT_OFFSETS {
+        if let Some(to) = from.offset(df, dr) {
+            if let Some(p) = board.piece_at(to) {
+                if p.color != color {
+                    moves.push(Move::new(from, to));
+                }
+            }
+        }
+    }
+}
+
+fn add_sliding_captures(
+    board: &Board,
+    from: Square,
+    color: Color,
+    dirs: &[(isize, isize)],
+    moves: &mut Vec<Move>,
+) {
+    for &(df, dr) in dirs {
+        let mut sq = from;
+        while let Some(to) = sq.offset(df, dr) {
+            match board.piece_at(to) {
+                Some(p) if p.color != color => {
+                    moves.push(Move::new(from, to));
+                    break;
+                }
+                Some(_) => break,
+                None => sq = to,
+            }
+        }
+    }
+}
+
+fn add_king_captures(board: &Board, from: Square, color: Color, moves: &mut Vec<Move>) {
+    for &(df, dr) in &KING_OFFSETS {
+        if let Some(to) = from.offset(df, dr) {
+            if let Some(p) = board.piece_at(to) {
+                if p.color != color {
+                    moves.push(Move::new(from, to));
+                }
+            }
+        }
+    }
+}
+
+pub fn capture_moves(
+    board: &Board,
+    color: Color,
+    ep_target: Option<Square>,
+    _castling: &CastlingRights,
+) -> Vec<Move> {
+    let mut moves = Vec::with_capacity(32);
+    for rank in 0..8 {
+        for file in 0..8 {
+            let from = Square::new_unchecked(file, rank);
+            if let Some(piece) = board.piece_at(from) {
+                if piece.color != color {
+                    continue;
+                }
+                match piece.kind {
+                    PieceType::Pawn => {
+                        add_pawn_quiescence(board, from, color, ep_target, &mut moves);
+                    }
+                    PieceType::Knight => {
+                        add_knight_captures(board, from, color, &mut moves);
+                    }
+                    PieceType::Bishop => {
+                        add_sliding_captures(board, from, color, &BISHOP_DIRS, &mut moves);
+                    }
+                    PieceType::Rook => {
+                        add_sliding_captures(board, from, color, &ROOK_DIRS, &mut moves);
+                    }
+                    PieceType::Queen => {
+                        add_sliding_captures(board, from, color, &ROOK_DIRS, &mut moves);
+                        add_sliding_captures(board, from, color, &BISHOP_DIRS, &mut moves);
+                    }
+                    PieceType::King => {
+                        add_king_captures(board, from, color, &mut moves);
+                    }
+                }
+            }
+        }
+    }
+    moves.into_iter().filter(|mv| is_legal(board, mv, color)).collect()
+}
+
 fn is_ep_move(piece: Option<Piece>, mv: &Move, board: &Board) -> bool {
     piece.is_some_and(|p| {
         p.kind == PieceType::Pawn && mv.from.file != mv.to.file && board.piece_at(mv.to).is_none()
@@ -365,7 +492,8 @@ fn apply_move(board: &Board, mv: &Move, color: Color) -> AppliedMove {
     AppliedMove { board: new_board, captured }
 }
 
-fn is_legal(board: &Board, mv: &Move, color: Color) -> bool {
+#[doc(hidden)]
+pub fn is_legal(board: &Board, mv: &Move, color: Color) -> bool {
     let applied = apply_move(board, mv, color);
 
     let king_sq = match applied.board.king_square(color) {

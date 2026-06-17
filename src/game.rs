@@ -52,6 +52,14 @@ struct Snapshot {
     move_history: Vec<Move>,
 }
 
+#[derive(Clone, Debug)]
+pub(crate) struct UndoInfo {
+    pub board: Board,
+    pub turn: Color,
+    pub castling: CastlingRights,
+    pub ep_target: Option<Square>,
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct Game {
     board: Board,
@@ -288,6 +296,122 @@ impl Game {
         self.position_history = snap.position_history;
         self.move_history = snap.move_history;
         true
+    }
+
+    pub(crate) fn make_move_search(&mut self, mv: Move) -> UndoInfo {
+        let undo = UndoInfo {
+            board: self.board.clone(),
+            turn: self.turn,
+            castling: self.castling,
+            ep_target: self.ep_target,
+        };
+
+        let piece = self.board.piece_at(mv.from).expect("piece must exist at from in make_move_search");
+
+        let is_ep = (self.ep_target == Some(mv.to))
+            && piece.kind == PieceType::Pawn
+            && mv.from.file != mv.to.file;
+
+        self.board.set_piece(mv.to, Some(piece));
+        self.board.set_piece(mv.from, None);
+
+        if is_ep {
+            let captured_sq = Square::new_unchecked(mv.to.file, mv.from.rank);
+            self.board.set_piece(captured_sq, None);
+        }
+
+        let is_castle = piece.kind == PieceType::King
+            && (mv.to.file as isize - mv.from.file as isize).abs() == 2;
+
+        if is_castle {
+            let (rook_from_file, rook_to_file) = if mv.to.file > mv.from.file {
+                (7, 5)
+            } else {
+                (0, 3)
+            };
+            let rank = mv.from.rank;
+            let rook_from = Square::new_unchecked(rook_from_file, rank);
+            let rook_to = Square::new_unchecked(rook_to_file, rank);
+            let rook = self.board.piece_at(rook_from);
+            self.board.set_piece(rook_to, rook);
+            self.board.set_piece(rook_from, None);
+        }
+
+        if let Some(promotion) = mv.promotion {
+            self.board
+                .set_piece(mv.to, Some(Piece::new(promotion, self.turn)));
+        }
+
+        self.ep_target = if piece.kind == PieceType::Pawn {
+            let rank_diff = (mv.to.rank as isize - mv.from.rank as isize).abs();
+            if rank_diff == 2 {
+                let mid_rank = (mv.from.rank + mv.to.rank) / 2;
+                Some(Square::new_unchecked(mv.from.file, mid_rank))
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+
+        if piece.kind == PieceType::King {
+            match self.turn {
+                Color::White => {
+                    self.castling.white_kingside = false;
+                    self.castling.white_queenside = false;
+                }
+                Color::Black => {
+                    self.castling.black_kingside = false;
+                    self.castling.black_queenside = false;
+                }
+            }
+        }
+
+        if piece.kind == PieceType::Rook {
+            match (self.turn, mv.from.file) {
+                (Color::White, 0) => self.castling.white_queenside = false,
+                (Color::White, 7) => self.castling.white_kingside = false,
+                (Color::Black, 0) => self.castling.black_queenside = false,
+                (Color::Black, 7) => self.castling.black_kingside = false,
+                _ => {}
+            }
+        }
+
+        if mv.to.file == 0 && mv.to.rank == 0 {
+            self.castling.white_queenside = false;
+        }
+        if mv.to.file == 7 && mv.to.rank == 0 {
+            self.castling.white_kingside = false;
+        }
+        if mv.to.file == 0 && mv.to.rank == 7 {
+            self.castling.black_queenside = false;
+        }
+        if mv.to.file == 7 && mv.to.rank == 7 {
+            self.castling.black_kingside = false;
+        }
+
+        self.turn = self.turn.opponent();
+
+        undo
+    }
+
+    pub(crate) fn undo_move(&mut self, info: UndoInfo) {
+        self.board = info.board;
+        self.turn = info.turn;
+        self.castling = info.castling;
+        self.ep_target = info.ep_target;
+    }
+
+    pub(crate) fn null_move_begin(&mut self) -> Option<Square> {
+        let old = self.ep_target;
+        self.ep_target = None;
+        self.turn = self.turn.opponent();
+        old
+    }
+
+    pub(crate) fn null_move_end(&mut self, old_ep: Option<Square>) {
+        self.ep_target = old_ep;
+        self.turn = self.turn.opponent();
     }
 
     pub fn status(&self) -> GameStatus {

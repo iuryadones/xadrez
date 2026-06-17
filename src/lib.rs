@@ -1,3 +1,6 @@
+#![deny(warnings)]
+#![deny(clippy::all)]
+
 pub mod ai;
 pub mod board;
 pub mod fen;

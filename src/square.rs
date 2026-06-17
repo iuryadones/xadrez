@@ -71,3 +71,71 @@ impl fmt::Display for Square {
         write!(f, "{}", self.to_algebraic())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_square_new_valid() {
+        let sq = Square::new(0, 0).unwrap();
+        assert_eq!(sq.file, 0);
+        assert_eq!(sq.rank, 0);
+    }
+
+    #[test]
+    fn test_square_new_invalid() {
+        assert!(Square::new(8, 0).is_none());
+        assert!(Square::new(0, 8).is_none());
+        assert!(Square::new(8, 8).is_none());
+    }
+
+    #[test]
+    fn test_square_from_algebraic() {
+        let sq = Square::from_algebraic("e4").unwrap();
+        assert_eq!(sq.file, 4);
+        assert_eq!(sq.rank, 3);
+        assert_eq!(Square::from_algebraic("a1").unwrap().file, 0);
+        assert_eq!(Square::from_algebraic("a1").unwrap().rank, 0);
+        assert_eq!(Square::from_algebraic("h8").unwrap().file, 7);
+        assert_eq!(Square::from_algebraic("h8").unwrap().rank, 7);
+    }
+
+    #[test]
+    fn test_square_from_algebraic_invalid() {
+        assert!(Square::from_algebraic("i1").is_none());
+        assert!(Square::from_algebraic("a9").is_none());
+        assert!(Square::from_algebraic("foo").is_none());
+        assert!(Square::from_algebraic("").is_none());
+    }
+
+    #[test]
+    fn test_square_to_algebraic() {
+        assert_eq!(Square::new_unchecked(0, 0).to_algebraic(), "a1");
+        assert_eq!(Square::new_unchecked(7, 7).to_algebraic(), "h8");
+        assert_eq!(Square::new_unchecked(4, 3).to_algebraic(), "e4");
+    }
+
+    #[test]
+    fn test_square_offset() {
+        let sq = Square::from_algebraic("e4").unwrap();
+        assert_eq!(sq.offset(1, 1).map(|s| s.to_algebraic()).as_deref(), Some("f5"));
+        assert_eq!(sq.offset(-1, -1).map(|s| s.to_algebraic()).as_deref(), Some("d3"));
+        assert_eq!(sq.offset(10, 0), None);
+        assert_eq!(sq.offset(0, -10), None);
+    }
+
+    #[test]
+    fn test_square_is_valid() {
+        assert!(Square::new_unchecked(0, 0).is_valid());
+        assert!(Square::new_unchecked(7, 7).is_valid());
+        assert!(!Square::new_unchecked(8, 0).is_valid());
+        assert!(!Square::new_unchecked(0, 8).is_valid());
+    }
+
+    #[test]
+    fn test_square_display() {
+        assert_eq!(format!("{}", Square::from_algebraic("e4").unwrap()), "e4");
+        assert_eq!(format!("{}", Square::from_algebraic("a1").unwrap()), "a1");
+    }
+}

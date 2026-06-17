@@ -1,4 +1,3 @@
-use chess::*;
 use yew::prelude::*;
 
 use crate::state::{GameAction, GameState};
@@ -27,7 +26,7 @@ pub fn PromotionDialog(props: &PromotionDialogProps) -> Html {
                 <div class="promotion-options">
                     { candidates.iter().map(|mv| {
                         let pt = mv.promotion.unwrap();
-                        let glyph = pt.to_unicode_square(Color::White, is_light);
+                        let glyph = pt.to_unicode_square(props.state.game.turn(), is_light);
                         let label = pt.to_char().to_ascii_uppercase();
                         let state = props.state.clone();
                         let mv = *mv;

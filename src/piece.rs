@@ -109,3 +109,62 @@ impl fmt::Display for Piece {
         write!(f, "{}", self.kind.to_unicode(self.color))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_color_opponent() {
+        assert_eq!(Color::White.opponent(), Color::Black);
+        assert_eq!(Color::Black.opponent(), Color::White);
+        assert_eq!(Color::White.opponent().opponent(), Color::White);
+    }
+
+    #[test]
+    fn test_piecetype_from_char() {
+        assert_eq!(PieceType::from_char('K'), Some(PieceType::King));
+        assert_eq!(PieceType::from_char('q'), Some(PieceType::Queen));
+        assert_eq!(PieceType::from_char('r'), Some(PieceType::Rook));
+        assert_eq!(PieceType::from_char('B'), Some(PieceType::Bishop));
+        assert_eq!(PieceType::from_char('N'), Some(PieceType::Knight));
+        assert_eq!(PieceType::from_char('p'), Some(PieceType::Pawn));
+        assert_eq!(PieceType::from_char('x'), None);
+    }
+
+    #[test]
+    fn test_piecetype_to_char() {
+        assert_eq!(PieceType::King.to_char(), 'k');
+        assert_eq!(PieceType::Queen.to_char(), 'q');
+        assert_eq!(PieceType::Rook.to_char(), 'r');
+        assert_eq!(PieceType::Bishop.to_char(), 'b');
+        assert_eq!(PieceType::Knight.to_char(), 'n');
+        assert_eq!(PieceType::Pawn.to_char(), 'p');
+    }
+
+    #[test]
+    fn test_piecetype_to_unicode() {
+        assert_eq!(PieceType::King.to_unicode(Color::White), "♔");
+        assert_eq!(PieceType::King.to_unicode(Color::Black), "♚");
+        assert_eq!(PieceType::Queen.to_unicode(Color::White), "♕");
+        assert_eq!(PieceType::Queen.to_unicode(Color::Black), "♛");
+        assert_eq!(PieceType::Pawn.to_unicode(Color::White), "♙");
+        assert_eq!(PieceType::Pawn.to_unicode(Color::Black), "♟");
+    }
+
+    #[test]
+    fn test_piece_from_fen_char() {
+        assert_eq!(Piece::from_fen_char('K'), Some(Piece::new(PieceType::King, Color::White)));
+        assert_eq!(Piece::from_fen_char('k'), Some(Piece::new(PieceType::King, Color::Black)));
+        assert_eq!(Piece::from_fen_char('P'), Some(Piece::new(PieceType::Pawn, Color::White)));
+        assert_eq!(Piece::from_fen_char('p'), Some(Piece::new(PieceType::Pawn, Color::Black)));
+        assert_eq!(Piece::from_fen_char('.'), None);
+    }
+
+    #[test]
+    fn test_piece_to_fen_char() {
+        assert_eq!(Piece::new(PieceType::King, Color::White).to_fen_char(), 'K');
+        assert_eq!(Piece::new(PieceType::King, Color::Black).to_fen_char(), 'k');
+        assert_eq!(Piece::new(PieceType::Pawn, Color::White).to_fen_char(), 'P');
+    }
+}
