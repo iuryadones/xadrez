@@ -74,7 +74,10 @@ web-build:
 web-deploy:
 	cd chess-wasm && trunk build --release --public-url ./ --dist /tmp/gh-dist
 	git checkout gh-pages
-	cp /tmp/gh-dist/* .
+	git rm -rf .
+	cp /tmp/gh-dist/index.html .
+	cp /tmp/gh-dist/chess-wasm-*.js .
+	cp /tmp/gh-dist/chess-wasm-*_bg.wasm .
 	git add .
 	git commit -m "deploy: atualizar site WASM"
 	git push
