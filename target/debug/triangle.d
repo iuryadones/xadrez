@@ -1,0 +1,1 @@
+/home/xavier/Documentos/game_xadrez/target/debug/triangle: /home/xavier/Documentos/game_xadrez/scripts/src/art.rs /home/xavier/Documentos/game_xadrez/scripts/src/main.rs /home/xavier/Documentos/game_xadrez/scripts/src/reader.rs /home/xavier/Documentos/game_xadrez/scripts/src/triangle.rs
